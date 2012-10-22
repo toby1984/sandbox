@@ -13,7 +13,7 @@ public final class PathFinder
     private final int sceneHeight;
     
     // nodes to check 
-    private final Set<PathNode> openList = new HashSet<PathNode>();
+    private final Set<PathNode> open = new HashSet<PathNode>();
     
     // nodes ruled out
     private final Set<PathNode> closeList = new HashSet<PathNode>();
@@ -24,19 +24,29 @@ public final class PathFinder
         public final int x;
         public final int y;
         
-        public PathNode(int x,int y) {
+        private int f;
+        private int g;
+        
+        public PathNode(int x,int y) 
+        {
             this(x,y,null);
         }
-        public PathNode(int x,int y,PathNode parent) {
+        
+        public PathNode(int x,int y,PathNode parent) 
+        {
             this.parent=parent;
             this.x = x;
             this.y = y;
         }
+
+        public void f(int value) { this.f = value; }
+        public void g(int value) { this.g = value; }
+        
+        public int f() { return f; }
+        public int g() { return g;}
         
         public PathNode parent() { return parent; }
-        
         public void setParent(PathNode parent) { this.parent = parent; }
-        
         public int x() { return x; }
         public int y() { return y; }
         
@@ -110,7 +120,7 @@ public final class PathFinder
             return start;
         }
         
-        openList.clear();
+        open.clear();
         closeList.clear();
         
         closeList.add( start );
@@ -118,16 +128,16 @@ public final class PathFinder
         PathNode current = start;
         while ( true ) 
         {
-            findNeighbors( current );
+            findNeighbors( current , target );
             
-            if ( openList.isEmpty() ) {
+            if ( open.isEmpty() ) {
             	return null;
             }
             
             // find node with lowest path cost
             PathNode bestMatch = null;
             int bestMatchCost = Integer.MAX_VALUE;
-            for(PathNode n : openList) 
+            for(PathNode n : open) 
             {
                 final int cost = calcCost(n, target );
                 if ( bestMatch == null || cost < bestMatchCost ) 
@@ -137,7 +147,7 @@ public final class PathFinder
                 } 
             }
             
-            openList.remove( bestMatch );
+            open.remove( bestMatch );
             
             closeList.add( bestMatch );            
             
@@ -154,6 +164,13 @@ public final class PathFinder
         final int movementCost = calcMovementCost(current);
         final int estimatedCost = calcEstimatedCost( current , target );
         return movementCost + estimatedCost;
+    }
+    
+    private void assignCost(PathNode current,PathNode target) {
+        final int movementCost = calcMovementCost(current);
+        final int estimatedCost = calcEstimatedCost( current , target );
+        current.f( movementCost + estimatedCost );
+        current.g( movementCost );
     }
 
     private int calcMovementCost(PathNode current)
@@ -186,7 +203,7 @@ public final class PathFinder
         return (xDelta + yDelta)*10;
     }    
     
-    public void findNeighbors(PathNode current) 
+    public void findNeighbors(PathNode current,PathNode target) 
     {    
         // visit neighbor nodes
         final int startX = current.x > 0 ? current.x - 1 : current.x;
@@ -209,7 +226,7 @@ public final class PathFinder
                         {
                             PathNode match = null;
                             
-                            for ( PathNode n : openList ) 
+                            for ( PathNode n : open ) 
                             {
                                 if ( n.equals( newNode ) ) {
                                     match = n;
@@ -217,16 +234,17 @@ public final class PathFinder
                                 }
                             }
                             
+                            assignCost( newNode , target);
+                            
                             if ( match == null )
                             {
-                                openList.add( newNode );
+                                open.add( newNode );
+                                
                             } else {
-                                // already on open list, check which path is cheaper
-                                final int thisCost = calcMovementCost( newNode );
-                                final int otherCost = calcMovementCost( match );
-                                if ( thisCost < otherCost ) 
+                                // already on open list, check which path is shorter
+                                if ( newNode.g < match.g ) 
                                 {
-                                    openList.add( newNode );
+                                    open.add( newNode );
                                 } 
                             }
                         }
