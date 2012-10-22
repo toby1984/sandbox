@@ -1,6 +1,10 @@
 package de.codesourcery.sandbox.pathfinder;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -12,11 +16,12 @@ public final class PathFinder
     private final int sceneWidth;
     private final int sceneHeight;
     
-    // nodes to check 
-    private final Set<PathNode> open = new HashSet<PathNode>();
+    // nodes to check
+    private final List<PathNode> openList=new ArrayList<>();
+    private final Map<PathNode,PathNode> openMap=new HashMap<>();
     
     // nodes ruled out
-    private final Set<PathNode> closeList = new HashSet<PathNode>();
+    private final Set<PathNode> closeList = new HashSet<>();
     
     public static final class PathNode 
     {
@@ -114,15 +119,32 @@ public final class PathFinder
         this.sceneHeight = scene.getHeight();
     }
     
+    private void insert(PathNode node) {
+    	
+    	openMap.put(node,node);
+    	
+    	int len = openList.size();
+    	for ( int i = 0 ; i < len ; i++ ) {
+    		if ( node.f() <= openList.get(i).f() ) {
+    			openList.add( i , node );
+    			return;
+    		}
+    	}
+    	openList.add( node );
+    }
+    
     public PathNode findPath(PathNode start,PathNode target) 
     {
         if ( start.equals( target ) ) { // trivial case
             return start;
         }
         
-        open.clear();
+        openList.clear();
+        openMap.clear();
+        
         closeList.clear();
         
+        assignCost( start, target);
         closeList.add( start );
         
         PathNode current = start;
@@ -130,24 +152,12 @@ public final class PathFinder
         {
             findNeighbors( current , target );
             
-            if ( open.isEmpty() ) {
+            if ( openList.isEmpty() ) {
             	return null;
             }
             
             // find node with lowest path cost
-            PathNode bestMatch = null;
-            int bestMatchCost = Integer.MAX_VALUE;
-            for(PathNode n : open) 
-            {
-                final int cost = calcCost(n, target );
-                if ( bestMatch == null || cost < bestMatchCost ) 
-                {
-                    bestMatch = n;
-                    bestMatchCost = cost;
-                } 
-            }
-            
-            open.remove( bestMatch );
+            final PathNode bestMatch = openList.remove( 0 );
             
             closeList.add( bestMatch );            
             
@@ -157,13 +167,6 @@ public final class PathFinder
             }            
             current = bestMatch;
         }
-    }
-    
-    private int calcCost(PathNode current,PathNode target) 
-    {
-        final int movementCost = calcMovementCost(current);
-        final int estimatedCost = calcEstimatedCost( current , target );
-        return movementCost + estimatedCost;
     }
     
     private void assignCost(PathNode current,PathNode target) {
@@ -224,29 +227,14 @@ public final class PathFinder
                         
                         if ( ! closeList.contains(newNode) ) 
                         {
-                            PathNode match = null;
-                            
-                            for ( PathNode n : open ) 
-                            {
-                                if ( n.equals( newNode ) ) {
-                                    match = n;
-                                    break;
-                                }
-                            }
+                            PathNode match = openMap.get(newNode);
                             
                             assignCost( newNode , target);
                             
-                            if ( match == null )
+                            if ( match == null || newNode.g < match.g )
                             {
-                                open.add( newNode );
-                                
-                            } else {
-                                // already on open list, check which path is shorter
-                                if ( newNode.g < match.g ) 
-                                {
-                                    open.add( newNode );
-                                } 
-                            }
+                                insert( newNode );
+                            } 
                         }
                     } 
                 } 
