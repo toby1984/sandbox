@@ -13,92 +13,73 @@ public class BSP<T> {
 		public boolean visit(BSPNode<T> node,int currentDepth);
 	}	
 	
-	protected static final class BSPNode<T> 
+	protected static class BSPNode<T> 
 	{
 		public final int x1;
 		public final int y1;
 		public final int x2;
 		public final int y2;
 		
-		public T value;
-		
-		public  final List<BSPNode<T>> children=new ArrayList<>();
+		@SuppressWarnings("rawtypes")
+		public final BSPNode[] children = new BSPNode[4];
 		
 		@Override
 		public String toString() {
-			return "BSPNode [ x=" + x1 + ", y = "+y1+" , width=" + width()+ ", height=" + height()+ " , value=" + value + "]";
+			return "BSPNode [ x=" + x1 + ", y = "+y1+" , width=" + width()+ ", height=" + height() +"]";
 		}
 
 		public BSPNode(int x, int y,int width,int height) {
-			this(x,y,width , height , null );
-		}
-		
-		public BSPNode(int x, int y,int width,int height,T value) {
 			this.x1 = x;
 			this.y1 = y;
 			this.x2 = x1+width;
 			this.y2 = y1+height;
-			this.value = value;
 		}
 		
-		public boolean contains(int x,int y) {
+		public final boolean contains(int x,int y) {
 			return x >= x1 && x < x2 &&
 				   y >= y1 && y < y2;
 		}
 		
-		public BSPNode<T> find(int x,int y) 
-		{
-			if ( ! contains( x,y ) ) {
-				return null;
-			}
-			for ( BSPNode<T> child : children ) 
-			{
-				if ( child.contains( x, y ) ) {
-					return child.find( x , y );
-				}
-			}
-			return this;
+		public final boolean visitPreOrder(IVisitor<T> v) {
+			return visitPreOrder(v,0);
 		}
 		
-		public boolean visit(IVisitor<T> v) {
-			return visit(v,0);
-		}
-		
-		public boolean visit(IVisitor<T> v,int currentDepth) {
+		public final boolean visitPreOrder(IVisitor<T> v,int currentDepth) {
 			
 			if ( ! v.visit( this , currentDepth ) ) {
 				return false;
 			}
-			for ( BSPNode<T> child : children ) {
-				if ( ! child.visit( v , currentDepth+1) ) {
+			for ( BSPNode<T> child : children ) 
+			{
+				if ( child != null && ! child.visitPreOrder( v , currentDepth+1) ) {
 					return false;
 				}
 			}
 			return true;
 		}
 		
-		public int width() {
+		public final int width() {
 			return x2-x1;
 		}
 		
-		public int height() {
+		public final int height() {
 			return y2-y1;
 		}
 		
 		public T getValue(int x,int y) 
 		{
-			if ( this.x1 == x && this.y1 == y && this.width() == 1 && this.height() == 1 ) {
-				return this.value;
+			if ( this.x1 == x && this.y1 == y && isLeaf() ) {
+				return ((BSPLeafNode<T>) this).getValue();
 			}
 			
 			if ( ! contains( x,y ) ) {
 				return null;
 			}
 			
-			for ( BSPNode<T> child : children ) {
-				if ( child.contains(x, y ) ) {
-					return child.getValue(x,y);
-				}
+			@SuppressWarnings("unchecked")
+			final BSPNode<T> child = children[ getQuadrant(x, y ) ];
+			if ( child != null ) {
+				return child.getValue(x,y);
 			}
 			return null;
 		}
@@ -125,57 +106,108 @@ public class BSP<T> {
 				   ( px2 >= x1 && px2 < x2 && py2 >= y1 && py2 < y2 );				   
 		}
 		
-		public List<BSPNode<T>> getValues(int x,int y,int width,int height) 
+		public List<BSPLeafNode<T>> getValues(int x,int y,int width,int height) 
 		{
-			final List<BSPNode<T>> result = new ArrayList<>();
+			final List<BSPLeafNode<T>> result = new ArrayList<>();
 			getValues(x,y,width,height, result);
 			return result;
 		}
 		
-		private void getValues(int x,int y,int width,int height,List<BSPNode<T>> result) 
+		private void getValues(int x,int y,int width,int height,List<BSPLeafNode<T>> result) 
 		{
 			if ( this.intersects( x, y, width,height ) ) 
 			{
-				if ( this.width() == 1 && this.height() == 1 ) {
-					if ( value != null ) {
-						result.add( this );
+				if ( isLeaf() ) 
+				{
+					final BSPLeafNode<T> leaf = (BSPLeafNode<T>) this;
+					T v = leaf.getValue();
+					if ( v!= null ) {
+						result.add( leaf );
 					}
 				} 
 				else 
 				{
 					for ( BSPNode<T> child : children ) 
 					{
-						child.getValues( x , y , width , height , result );
+						if ( child != null ) {
+							child.getValues( x , y , width , height , result );
+						}
 					}
 				}
 			}
 		}
 		
-		public void add(BSPNode<T> node) {
-			/*
-			 * +--+--+
-			 * |  |  |
-			 * +--+--+
-			 * |  |  |
-			 * +--+--+
-			 * 
-			 */
-			
-			if ( children.isEmpty() ) {
-				children.add( node );
-				return;
-			}
-			
-			final BSPNode<T> oldValueChild = children.size() == 1 ? children.remove(0) : null;
-			
+		private int getQuadrant(BSPNode<T> node) 
+		{
+			return getQuadrant( node.x1 , node.y1 );
+		}
+		
+		private int getQuadrant(int x , int y) 
+		{
 			final int w = width();
 			final int h = height();
 			
-			if ( w < 2 && h < 2) 
+			final int newWidth = w > 1 ? w / 2 : w;
+			final int newHeight = h > 1 ? h / 2 : h;
+			
+			if ( x >= x1 && x < x1 + newWidth &&
+			     y >= y1 && y < y1 + newHeight ) 
 			{
-				value = node.value;
+			  return 0;
+			}
+			
+			if ( x >= x1+newWidth && x < x1 + w &&
+				 y >= y1 && y < y1 + newHeight ) 
+		    {
+			  return 1;
+		    }			
+			
+			if ( x >= x1 && x < x1 + newWidth &&
+				 y >= y1+newHeight && y < y1 + h) 
+		    {
+				return 2;
+			 }			
+			return 3;
+		}
+		
+		public void add(BSPLeafNode<T> node) 
+		{
+			if ( isLeaf() ) 
+			{
+				if ( x1 == node.x1 && y1 == node.x2 ) 
+				{
+					((BSPLeafNode<T>) this).setValue( node.getValue() );
+					return;
+				} 
+				throw new IllegalStateException("Unreachable code reached");
+			}
+			
+			final int quadrant = getQuadrant( node );
+			
+			@SuppressWarnings("unchecked")
+			final BSPNode<T> child = children[quadrant];
+			if ( child == null ) 
+			{
+				children[quadrant] = node;
 				return;
-			} 
+			}
+			
+			if ( ! child.isLeaf() ) 
+			{
+				child.add( node ); // recurse
+				return;
+			}
+			
+			// we already got a leaf at the quadrant we want to insert 
+			if ( child.x1 == node.x1 && child.y1 == node.y1 ) 
+			{
+				((BSPLeafNode<T>) child).setValue( node.getValue() );
+				return;
+			}
+			
+			// split child
+			final int w = width();
+			final int h = height();
 			
 			final int newWidth = w > 1 ? w / 2 : w;
 			final int deltaWidth = w - newWidth*2;
@@ -183,51 +215,61 @@ public class BSP<T> {
 			final int newHeight = h > 1 ? h / 2 : h;
 			final int deltaHeight = w - newHeight*2;
 			
-			final List<BSPNode<T>> nodes = new ArrayList<>();
-			
-			if ( w > 1 && h > 1 ) 
+			final BSPNode<T> newNode;
+			switch( quadrant )
 			{
-				// partition both dimensions
-				System.out.println("Split both: "+newWidth+"+"+deltaWidth+","+newHeight+"+"+deltaHeight);
-				nodes.add( new BSPNode<T>(x1,y1,newWidth,newHeight) );
-				nodes.add( new BSPNode<T>(x1+newWidth,y1,newWidth+deltaWidth,newHeight) );
-				
-				nodes.add( new BSPNode<T>(x1,y1+newHeight,newWidth,newHeight+deltaHeight) );
-				nodes.add( new BSPNode<T>(x1+newWidth,y1+newHeight,newWidth+deltaWidth,newHeight+deltaHeight) );
-				
-			} else if ( w > 1 && h < 2 ) {
-				// partition horizontally
-				nodes.add( new BSPNode<T>(x1,y1,newWidth,newHeight) );
-				nodes.add( new BSPNode<T>(x1+newWidth,y1,newWidth+deltaWidth,newHeight) );				
-			} else if ( w < 2 && h > 1 ) {
-				// partition vertically
-				nodes.add( new BSPNode<T>(x1,y1,newWidth,newHeight) );
-				nodes.add( new BSPNode<T>(x1,y1+newHeight,newWidth,newHeight+deltaHeight) );
-			}
-
-			// sort children into new nodes
-outer:			
-			for( BSPNode<T> child : children ) 
-			{
-				for ( BSPNode<T> newNode : nodes ) {
-					if ( newNode.contains( child.x1 , child.y1 ) ) {
-						newNode.children.add( child );
-						break outer;
-					}
-				}
-				throw new IllegalStateException("Unreachable code reached");
+				case 0:
+					newNode = new BSPNode<T>(x1,y1,newWidth,newHeight);
+					break;
+				case 1:
+					newNode = new BSPNode<T>(x1+newWidth,y1,newWidth+deltaWidth,newHeight);
+					break;
+				case 2:
+					newNode = new BSPNode<T>(x1,y1+newHeight,newWidth,newHeight+deltaHeight);
+					break;
+				case 3:
+					newNode = new BSPNode<T>(x1+newWidth,y1+newHeight,newWidth+deltaWidth,newHeight+deltaHeight);
+					break;
+				default:
+					throw new IllegalStateException("Unreachable code reached");
 			}
 			
-			// replace this node with new nodes
-			children.clear();
-			children.addAll( nodes );
-			
-			// recurse
-			if ( oldValueChild != null ) {
-				find( oldValueChild.x1 , oldValueChild.y1 ).add( oldValueChild );
-			}
-			find( node.x1 , node.y1 ).add( node );
+			children[quadrant] = newNode;
+			newNode.add( (BSPLeafNode<T>) child );
+			newNode.add( node );
 		}
+		
+		public boolean isLeaf() {
+			return false;
+		}
+	}
+	
+	protected static final class BSPLeafNode<T> extends BSPNode<T> {
+
+		private T value;
+		
+		public BSPLeafNode(int x, int y, T value) {
+			super(x, y, 1, 1);
+			this.value = value;
+		}
+
+		public T getValue() {
+			return value;
+		}
+		
+		public void setValue(T value) {
+			this.value = value;
+		}
+		
+		@Override
+		public boolean isLeaf() {
+			return true;
+		}
+		
+		@Override
+		public String toString() {
+			return "BSPNode [ x=" + x1 + ", y = "+y1+" , width=" + width()+ ", height=" + height()+ " , value=" + value + "]";
+		} 
 	}
 	
 	public BSP(int width,int height) 
@@ -239,7 +281,8 @@ outer:
 		final BSP<Integer> tree = new BSP<Integer>(128,128);
 		
 		tree.store( 5 , 5 , 42 );
-		tree.store( 5 , 6 , 43 );
+		tree.store( 5 , 7 , 43 );
+		tree.store( 70 , 70 , 44 );
 		
 		System.out.println("At (5,5): "+tree.getValue(5,5));
 		System.out.println("At (5,7): "+tree.getValue(5,7));
@@ -251,14 +294,15 @@ outer:
 	public void store(int x,int y,T value) 
 	{
 		System.out.println("Storing "+value+" at ("+x+","+y+")");
-		root.find(x,y).add( new BSPNode<T>(x,y,1,1,value) );
+		root.add( new BSPLeafNode<T>(x,y,value) );
 	}
 	
 	public T getValue(int x,int y) {
 		return root.getValue(x,y);
 	}
 	
-	public List<BSPNode<T>> getValues(int x,int y,int width,int height) {
+	
+	public List<BSPLeafNode<T>> getValues(int x,int y,int width,int height) {
 		return root.getValues( x , y , width , height );
 	}
 	
@@ -275,6 +319,10 @@ outer:
 			}
 			
 		};
-		root.visit( visitor );
+		visitPreOrder( visitor );
+	}
+	
+	public void visitPreOrder(IVisitor<T> v) {
+		root.visitPreOrder( v );
 	}
 }
