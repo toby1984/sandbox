@@ -80,16 +80,16 @@ public final class PathFinder
         @Override
         public int hashCode()
         {
-            final int prime = 31;
-            int result = 31 + x;
-            result = prime * result + y;
-            return result;
+            return 31 * (31 + x) + y;
         }
         
         @Override
         public boolean equals(Object obj)
         {
-            if (obj instanceof PathNode)
+        	if ( obj == this ) {
+        		return true;
+        	}
+            if (obj.getClass() == PathNode.class )
             {
                 final PathNode other = (PathNode) obj;
                 return x == other.x && y == other.y;
@@ -141,7 +141,6 @@ public final class PathFinder
         
         openList.clear();
         openMap.clear();
-        
         closeList.clear();
         
         assignCost( start, target);
@@ -156,16 +155,15 @@ public final class PathFinder
             	return null;
             }
             
-            // find node with lowest path cost
-            final PathNode bestMatch = openList.remove( 0 );
+            final PathNode cheapestPath = openList.remove( 0 );
             
-            closeList.add( bestMatch );            
+            closeList.add( cheapestPath );            
             
-            if ( bestMatch.equals( target ) ) 
+            if ( cheapestPath.equals( target ) ) 
             {
-                return bestMatch;
+                return cheapestPath;
             }            
-            current = bestMatch;
+            current = cheapestPath;
         }
     }
     
@@ -227,11 +225,11 @@ public final class PathFinder
                         
                         if ( ! closeList.contains(newNode) ) 
                         {
-                            PathNode match = openMap.get(newNode);
+                            final PathNode existing = openMap.get(newNode);
                             
                             assignCost( newNode , target);
                             
-                            if ( match == null || newNode.g < match.g )
+                            if ( existing == null || newNode.g < existing.g ) // prefer shorter path
                             {
                                 insert( newNode );
                             } 

@@ -43,7 +43,7 @@ public class Main extends JFrame
     
     public void run() throws IOException
     {
-        setup(100,100);
+        setup(500,400);
         
         final File tmpFile = new File("/tmp/scene.bin");
         final JPanel panel = new JPanel() {
@@ -110,8 +110,8 @@ public class Main extends JFrame
                     {
                         lastX = modelX;
                         lastY = modelY;
-                        final byte newValue = scene.read(modelX,modelY) == IScene.FREE ? IScene.OCCUPIED : IScene.FREE;
-                        scene.write( modelX,modelY , newValue );
+//                        final byte newValue = scene.read(modelX,modelY) == IScene.FREE ? IScene.OCCUPIED : IScene.FREE;
+                        scene.write( modelX,modelY , IScene.OCCUPIED );
                         panel.repaint();
                     }
                 }               
