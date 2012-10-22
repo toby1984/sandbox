@@ -2,6 +2,7 @@ package de.codesourcery.sandbox.pathfinder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -15,19 +16,57 @@ public class BSP<T> {
 	
 	protected static class BSPNode<T> 
 	{
-		public final int x1;
-		public final int y1;
-		public final int x2;
-		public final int y2;
+		protected final int x1;
+		protected final int y1;
+		protected final int x2;
+		protected final int y2;
 		
-		@SuppressWarnings("rawtypes")
-		public final BSPNode[] children = new BSPNode[4];
+		protected BSPNode<T> q0= null;
+		protected BSPNode<T> q1= null;
+		protected BSPNode<T> q2= null;
+		protected BSPNode<T> q3= null;
 		
 		@Override
 		public String toString() {
 			return "BSPNode [ x=" + x1 + ", y = "+y1+" , width=" + width()+ ", height=" + height() +"]";
 		}
 
+		protected final BSPNode<T> getChild(int quadrant) 
+		{
+			switch(quadrant) {
+				case 0:
+					return q0;
+				case 1:
+					return q1;
+				case 2:
+					return q2;
+				case 3:
+					return q3;
+				default:
+					throw new IllegalArgumentException("Unknown quadrant: "+quadrant);
+			}
+		}
+		
+		protected final void setChild(int quadrant,BSPNode<T> child) 
+		{
+			switch(quadrant) {
+				case 0:
+					q0=child;
+					break;
+				case 1:
+					q1=child;
+					break;					
+				case 2:
+					q2=child;
+					break;					
+				case 3:
+					q3=child;
+					break;					
+				default:
+					throw new IllegalArgumentException("Unknown quadrant: "+quadrant);
+			}			
+		}
+		
 		public BSPNode(int x, int y,int width,int height) {
 			this.x1 = x;
 			this.y1 = y;
@@ -49,12 +88,23 @@ public class BSP<T> {
 			if ( ! v.visit( this , currentDepth ) ) {
 				return false;
 			}
-			for ( BSPNode<T> child : children ) 
-			{
-				if ( child != null && ! child.visitPreOrder( v , currentDepth+1) ) {
-					return false;
-				}
+
+			if ( q0 != null && ! q0.visitPreOrder( v , currentDepth +1 ) ) {
+				return false;
 			}
+			
+			if ( q1 != null && ! q1.visitPreOrder( v , currentDepth +1 ) ) {
+				return false;
+			}
+			
+			if ( q2 != null && ! q2.visitPreOrder( v , currentDepth +1 ) ) {
+				return false;
+			}		
+			
+			if ( q3 != null && ! q3.visitPreOrder( v , currentDepth +1 ) ) {
+				return false;
+			}			
+			
 			return true;
 		}
 		
@@ -68,18 +118,34 @@ public class BSP<T> {
 		
 		public T getValue(int x,int y) 
 		{
-			if ( this.x1 == x && this.y1 == y && isLeaf() ) {
+			if ( isLeaf() && this.x1 == x && this.y1 == y ) {
 				return ((BSPLeafNode<T>) this).getValue();
 			}
 			
-			if ( ! contains( x,y ) ) {
-				return null;
-			}
-			
-			@SuppressWarnings("unchecked")
-			final BSPNode<T> child = children[ getQuadrant(x, y ) ];
-			if ( child != null ) {
-				return child.getValue(x,y);
+			switch ( getQuadrant( x, y ) ) 
+			{
+				case 0:
+					if ( q0 != null ) {
+						return q0.getValue(x, y);
+					}
+					break;
+				case 1:
+					if ( q1 != null ) {
+						return q1.getValue(x, y);
+					}
+					break;
+				case 2:
+					if ( q2 != null ) {
+						return q2.getValue(x, y);
+					}
+					break;
+				case 3:
+					if ( q3 != null ) {
+						return q3.getValue(x, y);
+					}
+					break;
+				 default:
+					 // $$FALL-THROUGH$$
 			}
 			return null;
 		}
@@ -127,15 +193,37 @@ public class BSP<T> {
 				} 
 				else 
 				{
-					for ( BSPNode<T> child : children ) 
-					{
-						if ( child != null ) {
-							child.getValues( x , y , width , height , result );
-						}
+					if ( q0 != null ) {
+						q0.getValues( x , y , width , height , result );
 					}
+					if ( q1 != null ) {
+						q1.getValues( x , y , width , height , result );
+					}
+					if ( q2 != null ) {
+						q2.getValues( x , y , width , height , result );
+					}
+					if ( q3 != null ) {
+						q3.getValues( x , y , width , height , result );
+					}					
 				}
 			}
 		}
+		
+		public void print() {
+			
+			final IVisitor<T> visitor = new IVisitor<T>() {
+
+				@Override
+				public boolean visit(BSPNode<T> node, int currentDepth) 
+				{
+					final int indent = currentDepth*4;
+					System.out.println( StringUtils.repeat(" ", indent)+node);
+					return true;
+				}
+				
+			};
+			visitPreOrder( visitor );
+		}		
 		
 		private int getQuadrant(BSPNode<T> node) 
 		{
@@ -166,29 +254,38 @@ public class BSP<T> {
 				 y >= y1+newHeight && y < y1 + h) 
 		    {
 				return 2;
-			 }			
-			return 3;
+			}
+			
+			if ( x >= x1+newWidth && x < x1 + w &&
+			     y >= y1+newHeight && y < y1 + h) 
+			{
+				return 3;
+			}
+			return -1;
 		}
 		
 		public void add(BSPLeafNode<T> node) 
 		{
 			if ( isLeaf() ) 
 			{
-				if ( x1 == node.x1 && y1 == node.x2 ) 
+				if ( x1 != node.x1 || y1 != node.x2 ) 
 				{
-					((BSPLeafNode<T>) this).setValue( node.getValue() );
-					return;
-				} 
-				throw new IllegalStateException("Unreachable code reached");
+					throw new IllegalStateException("Unreachable code reached");
+				}
+				((BSPLeafNode<T>) this).setValue( node.getValue() );
+				return;				
 			}
 			
 			final int quadrant = getQuadrant( node );
+			if ( quadrant == -1 ) {
+				
+				throw new RuntimeException("Internal error, node "+this+" does not contain "+node);
+			}
 			
-			@SuppressWarnings("unchecked")
-			final BSPNode<T> child = children[quadrant];
+			final BSPNode<T> child = getChild(quadrant);
 			if ( child == null ) 
 			{
-				children[quadrant] = node;
+				setChild(quadrant , node );
 				return;
 			}
 			
@@ -234,7 +331,7 @@ public class BSP<T> {
 					throw new IllegalStateException("Unreachable code reached");
 			}
 			
-			children[quadrant] = newNode;
+			setChild(quadrant,newNode);
 			newNode.add( (BSPLeafNode<T>) child );
 			newNode.add( node );
 		}
@@ -277,49 +374,52 @@ public class BSP<T> {
 		root = new BSPNode<T>( 0 , 0 , width , height );
 	}
 	
-	public static void main(String[] args) {
-		final BSP<Integer> tree = new BSP<Integer>(128,128);
+	public static void main(String[] args) 
+	{
+		final BSP<Integer> tree = new BSP<Integer>(1024,1024);
 		
-		tree.store( 5 , 5 , 42 );
-		tree.store( 5 , 7 , 43 );
-		tree.store( 70 , 70 , 44 );
+//		tree.store( 5 , 5 , 42 );
+//		tree.store( 5 , 7 , 43 );
+//		tree.store( 70 , 70 , 44 );
+//		
+//		System.out.println("At (5,5): "+tree.getValue(5,5));
+//		System.out.println("At (5,7): "+tree.getValue(5,7));
+//		
+//		System.out.println("Values: "+tree.getValues(0,0,100,100) );
+//		tree.print();
 		
-		System.out.println("At (5,5): "+tree.getValue(5,5));
-		System.out.println("At (5,7): "+tree.getValue(5,7));
-		
-		System.out.println("Values: "+tree.getValues(0,0,100,100) );
-		tree.print();
+		Random rnd = new Random(System.currentTimeMillis());
+		long time = -System.currentTimeMillis();
+		for ( int i = 0 ; i < 100000 ; i++ ) {
+			final int x = rnd.nextInt( 1024 );
+			final int y = rnd.nextInt( 1024 );
+			final int value = rnd.nextInt(1024);
+			tree.store( x , y , value );
+			Integer stored = tree.getValue( x , y );
+			if ( stored == null || stored.intValue() != value ) {
+				throw new RuntimeException("Read at "+x+","+y+" failed, expected "+value+" , got "+stored);
+			}
+		}
+		time += System.currentTimeMillis();
+		System.out.println("Insert time: "+time+" ms");
 	}
 	
 	public void store(int x,int y,T value) 
 	{
-		System.out.println("Storing "+value+" at ("+x+","+y+")");
-		root.add( new BSPLeafNode<T>(x,y,value) );
+		try {
+			root.add( new BSPLeafNode<T>(x,y,value) );
+		} catch(RuntimeException e) {
+			root.print();
+			throw e;
+		}
 	}
 	
 	public T getValue(int x,int y) {
 		return root.getValue(x,y);
 	}
 	
-	
 	public List<BSPLeafNode<T>> getValues(int x,int y,int width,int height) {
 		return root.getValues( x , y , width , height );
-	}
-	
-	public void print() {
-		
-		final IVisitor<T> visitor = new IVisitor<T>() {
-
-			@Override
-			public boolean visit(BSPNode<T> node, int currentDepth) 
-			{
-				final int indent = currentDepth*4;
-				System.out.println( StringUtils.repeat(" ", indent)+node);
-				return true;
-			}
-			
-		};
-		visitPreOrder( visitor );
 	}
 	
 	public void visitPreOrder(IVisitor<T> v) {

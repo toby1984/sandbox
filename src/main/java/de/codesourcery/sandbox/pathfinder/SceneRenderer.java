@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import de.codesourcery.sandbox.pathfinder.IScene.ISceneVisitor;
+
 public class SceneRenderer
 {
     private final IScene scene;
@@ -89,7 +91,7 @@ public class SceneRenderer
         return id;
     }
 
-    public void renderScene(Dimension canvas, Graphics2D graphics) 
+    public void renderScene(Dimension canvas, final Graphics2D graphics) 
     {
         final int screenWidth = canvas.width;
         final int screenHeight = canvas.height;
@@ -117,12 +119,15 @@ public class SceneRenderer
         }        
         
         // draw grid
-        for ( IScene.ISceneIterator it = scene.iterator() ; it.hasNext() ; ) 
-        {
-            if ( it.next() == IScene.OCCUPIED ) {
-                graphics.fillRect( it.x() * xInc,it.y() * yInc , xInc , yInc );
-            }
-        }
+        
+        final ISceneVisitor visitor = new ISceneVisitor() {
+			
+			@Override
+			public void visit(int x, int y, byte cellStatus) {
+                graphics.fillRect( x * xInc,y * yInc , xInc , yInc );				
+			}
+		};
+		scene.visitOccupiedCells( visitor );
         
         // draw markers
         synchronized( markers ) 

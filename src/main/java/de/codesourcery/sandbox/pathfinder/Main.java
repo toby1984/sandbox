@@ -19,6 +19,8 @@ import java.util.TreeMap;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
+import de.codesourcery.sandbox.pathfinder.IScene.ISceneVisitor;
+
 
 public class Main extends JFrame
 {
@@ -159,14 +161,17 @@ public class Main extends JFrame
                     {
                         final IScene otherScene = Scene.load( tmpFile );
                         setup( otherScene.getWidth() , otherScene.getHeight() );
-                        IScene.ISceneIterator it = otherScene.iterator();
-                        while(it.hasNext() ) 
-                        {
-                            byte value = it.next();
-                            if ( value != IScene.FREE ) {
-                                scene.write( it.x(), it.y(), value );
-                            }
-                        }
+                        
+                        final ISceneVisitor v= new ISceneVisitor() {
+
+							@Override
+							public void visit(int x, int y, byte cellStatus) {
+								scene.write( x , y , cellStatus );
+							}
+                        };
+                        
+                        otherScene.visitOccupiedCells( v );
+                        
                         System.out.println("loaded.");
                         panel.repaint();
                     } catch (IOException e1) {

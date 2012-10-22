@@ -6,11 +6,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.util.NoSuchElementException;
+
+import de.codesourcery.sandbox.pathfinder.BSP.BSPLeafNode;
+import de.codesourcery.sandbox.pathfinder.BSP.BSPNode;
+import de.codesourcery.sandbox.pathfinder.BSP.IVisitor;
 
 public final class Scene implements IScene
 {
-    private final byte[] data;
+    private final BSP<Byte> data;
     private final int width;
     private final int height;
     
@@ -21,7 +24,7 @@ public final class Scene implements IScene
         }
         this.width = width;
         this.height = height;
-        this.data = new byte[ width * height ];
+        this.data = new BSP<Byte>( width , height );
     }
     
     @Override
@@ -39,70 +42,38 @@ public final class Scene implements IScene
     @Override
     public byte read(int x, int y)
     {
-        return data[y*height+x];        
+    	final Byte value = data.getValue( x , y);
+        return value == null ? IScene.FREE : value.byteValue();
     }
 
     @Override
     public IScene write(int x, int y, byte status)
     {
-        data[y*height+x] = status;
+    	if ( status == IScene.FREE ) {
+    		data.store(x,y, null );
+    	} else {
+    		data.store(x,y, Byte.valueOf( status) );
+    	}
         return this;
     }
-
+    
     @Override
-    public ISceneIterator iterator()
+    public void visitOccupiedCells(final ISceneVisitor cellVisitor)
     {
-        return new ISceneIterator() {
+    	
+    	final IVisitor<Byte> visitor = new IVisitor<Byte>() {
 
-            private int x = 0;
-            private int y = 0;
-            
-            private int currentX = -1;
-            private int currentY = -1;
-            
-            @Override
-            public byte next()
-            {
-                if ( y >= height ) {
-                    throw new NoSuchElementException();
-                }
-                final byte result = read(x,y);
-                
-                currentX = x;
-                currentY = y;
-                
-                x++;
-                if ( x == width ) {
-                    x = 0;
-                    y++;
-                }
-                return result;
-            }
-
-            @Override
-            public int x()
-            {
-                if ( currentX == -1 ) {
-                    throw new IllegalStateException("You need to call next() first");
-                }
-                return currentX;
-            }
-
-            @Override
-            public int y()
-            {
-                if ( currentY == -1 ) {
-                    throw new IllegalStateException("You need to call next() first");
-                }                
-                return currentY;
-            }
-
-            @Override
-            public boolean hasNext()
-            {
-                return y < height;
-            }
-        };
+			@Override
+			public boolean visit(BSPNode<Byte> node, int currentDepth) 
+			{
+				if ( node.isLeaf() ) {
+					Byte value = ((BSPLeafNode<Byte>) node).getValue();
+					cellVisitor.visit( node.x1 , node.y1 , value == null ? IScene.FREE : Byte.valueOf( value ) );
+				}
+				return true;
+			}
+		};
+		data.visitPreOrder( visitor );
     }
 
     @Override
@@ -115,20 +86,29 @@ public final class Scene implements IScene
         save( new ObjectOutputStream( new FileOutputStream( file ) ) , scene );
     }
     
-    public static void save(ObjectOutputStream out,IScene scene) throws IOException
+    public static void save(final ObjectOutputStream out,IScene scene) throws IOException
     {
         out.writeInt( scene.getWidth() );
         out.writeInt( scene.getHeight() );
         
-        ISceneIterator iterator = scene.iterator();
-        while( iterator.hasNext() ) {
-            byte value = iterator.next();
-            int x = iterator.x();
-            int y = iterator.y();
-            out.writeInt( x );
-            out.writeInt( y );
-            out.writeByte( value );
-        }
+        final ISceneVisitor visitor = new ISceneVisitor() {
+			
+			@Override
+			public void visit(int x, int y, byte value) 
+			{
+	            try {
+					out.writeInt( x );
+		            out.writeInt( y );
+		            out.writeByte( value );						
+				} 
+	            catch (IOException e) {
+					e.printStackTrace();
+					throw new RuntimeException(e);
+				}
+			
+			}
+		};
+		scene.visitOccupiedCells( visitor );
         out.close();
     }
 
@@ -147,7 +127,9 @@ public final class Scene implements IScene
             int x = in.readInt();
             int y = in.readInt();
             byte value = in.readByte();
-            result.write( x , y , value );
+            if ( value != IScene.FREE ) {
+            	result.write( x , y , value );
+            }
         }
         in.close();
         return result;

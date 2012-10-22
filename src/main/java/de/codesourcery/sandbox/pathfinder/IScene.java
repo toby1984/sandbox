@@ -1,5 +1,6 @@
 package de.codesourcery.sandbox.pathfinder;
 
+
 public interface IScene
 {
     public static final byte FREE=(byte)0;
@@ -27,5 +28,9 @@ public interface IScene
     
     public IScene write(int x,int y,byte status);
     
-    public ISceneIterator iterator();
+    public interface ISceneVisitor {
+    	public void visit(int x,int y,byte cellStatus);
+    }
+
+    public void visitOccupiedCells(final ISceneVisitor cellVisitor);    
 }
