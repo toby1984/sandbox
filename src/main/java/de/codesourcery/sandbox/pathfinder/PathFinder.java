@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.Stack;
 
 
-public class PathFinder
+public final class PathFinder
 {
     private final IScene scene;
     
@@ -118,7 +118,7 @@ public class PathFinder
         PathNode current = start;
         while ( true ) 
         {
-            findNeighbours( current );
+            findNeighbors( current );
             
             if ( openList.isEmpty() ) {
             	return null;
@@ -186,9 +186,9 @@ public class PathFinder
         return (xDelta + yDelta)*10;
     }    
     
-    public void findNeighbours(PathNode current) 
+    public void findNeighbors(PathNode current) 
     {    
-        // visit all adjactant nodes
+        // visit neighbor nodes
         final int startX = current.x > 0 ? current.x - 1 : current.x;
         final int endX = current.x < (sceneWidth -1 ) ? current.x + 1 : current.x; 
         

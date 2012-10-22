@@ -4,6 +4,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.Point;
 import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
@@ -201,7 +203,14 @@ public class Main extends JFrame
             };
         } );
         
-        frame.getContentPane().add( panel );
+        frame.getContentPane().setLayout( new GridBagLayout() );
+        final GridBagConstraints cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.gridx = GridBagConstraints.REMAINDER;
+        cnstrs.gridy = GridBagConstraints.REMAINDER;
+        cnstrs.weightx = 1.0;
+        cnstrs.weighty = 1.0;
+        frame.getContentPane().add( panel , cnstrs );
         frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
         frame.pack();
         frame.setVisible( true );

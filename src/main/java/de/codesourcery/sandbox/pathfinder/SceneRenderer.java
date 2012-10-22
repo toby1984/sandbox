@@ -96,6 +96,9 @@ public class SceneRenderer
         
         final int xInc = screenWidth / sceneWidth;
         final int yInc = screenHeight / sceneHeight;
+
+        final int xMax = sceneWidth * xInc;
+        final int yMax = sceneHeight * yInc;
         
         graphics.setColor(Color.RED);
         
@@ -103,14 +106,14 @@ public class SceneRenderer
         for ( int x = 0 ; x < sceneWidth ; x+=1) 
         {
             final int currentX=x*xInc ;
-            graphics.drawLine( currentX, 0 , currentX, screenHeight );
+            graphics.drawLine( currentX, 0 , currentX, yMax);
         }
         
         // draw grid X
         for ( int y = 0 ; y < sceneHeight ; y+=1) 
         {
             final int currentY=y*yInc ;
-            graphics.drawLine( 0, currentY , screenWidth , currentY );
+            graphics.drawLine( 0, currentY , xMax  , currentY );
         }        
         
         // draw grid
