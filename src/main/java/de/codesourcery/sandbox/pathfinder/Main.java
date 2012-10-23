@@ -11,8 +11,13 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -21,11 +26,15 @@ import javax.swing.JPanel;
 
 import de.codesourcery.sandbox.pathfinder.IScene.ISceneVisitor;
 
-
 public class Main extends JFrame
 {
     private static final int WIDTH = 1000;
     private static final int HEIGHT = 700;
+    
+    @SuppressWarnings("unused")
+    private static final boolean RENDER_GRID = WIDTH <= 100 && HEIGHT <= 100;
+    
+    private static final boolean THICK_SELECTION = ! RENDER_GRID;    
     
     private volatile IScene scene;
     private volatile PathFinder finder;
@@ -37,19 +46,23 @@ public class Main extends JFrame
         new Main().run();
     }
     
-    protected IScene setup(int width,int height) 
+    protected IScene setup(JPanel panel , List<Point> markers, int width,int height) 
     {
-        scene = new Scene(width,height);
+        scene = Scene.createInstance(width,height);
+        renderer = new SceneRenderer(scene,panel);
+        renderer.setRenderGrid( RENDER_GRID );
+        
         finder = new PathFinder( scene );
-        renderer = new SceneRenderer(scene);
         marked.clear();
+        for ( Point p : markers ) {
+            final long id = renderer.addMarker( p.x , p.y , Color.green );
+            marked.put( id , p );
+        }
         return scene;
     }
     
     public void run() throws IOException
     {
-        setup(WIDTH,HEIGHT);
-        
         final File tmpFile = new File("/tmp/scene.bin");
         final JPanel panel = new JPanel() {
             
@@ -60,6 +73,8 @@ public class Main extends JFrame
                 renderer.renderScene(getSize() , (Graphics2D) g );
             }
         };
+        
+        setup(panel , Collections.<Point>emptyList(), WIDTH,HEIGHT);
         
         final MouseAdapter listener = new MouseAdapter() 
         {
@@ -131,6 +146,9 @@ public class Main extends JFrame
                 
                 scene.write( x,y , IScene.OCCUPIED );
                 
+                if ( ! THICK_SELECTION ) {
+                    return;
+                }
                 final boolean notAtRightBorder = x+1 < scene.getWidth();
                 final boolean notAtBottomBorder = y+1 < scene.getHeight();
                 
@@ -199,8 +217,21 @@ public class Main extends JFrame
                 if ( e.getKeyChar() == 's' ) {
                     System.out.println("Saving as "+tmpFile.getAbsolutePath());
                     try {
-                        Scene.save( tmpFile , scene );
-                        System.out.println("Saved.");
+                        final ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(tmpFile));
+                        try 
+                        {
+                            // save start/end points
+                            out.writeInt(marked.size());
+                            for ( Point p : marked.values() ) {
+                                out.writeInt( p.x );
+                                out.writeInt( p.y );
+                            }
+                            // save scene
+                            Scene.save( out , scene );
+                            System.out.println("Saved.");
+                        } finally {
+                            out.close();
+                        }
                     } catch (IOException e1) {
                         e1.printStackTrace();
                     }
@@ -212,14 +243,23 @@ public class Main extends JFrame
                     System.out.println("Loading from "+tmpFile.getAbsolutePath());
                     try 
                     {
-                        final IScene otherScene = Scene.load( tmpFile );
-                        setup( otherScene.getWidth() , otherScene.getHeight() );
+                        final ObjectInputStream in = new ObjectInputStream(new FileInputStream(tmpFile));     
+                        final int markers = in.readInt();
+                        final List<Point> newMarkers = new ArrayList<>();
+                        for ( int i = 0 ; i < markers ; i++ ) {
+                            Point p = new Point( in.readInt() , in.readInt() );
+                            newMarkers.add( p );
+                        }
+                        
+                        final IScene otherScene = Scene.load( in );
+                        
+                        setup( panel , newMarkers , otherScene.getWidth() , otherScene.getHeight() );
                         
                         final ISceneVisitor v= new ISceneVisitor() {
 
 							@Override
 							public void visit(int x, int y, byte cellStatus) {
-								scene.write( x , y , cellStatus );
+							    scene.write( x , y , cellStatus );
 							}
                         };
                         
@@ -235,19 +275,23 @@ public class Main extends JFrame
                 
                 if ( e.getKeyChar() == ' ' && marked.size() == 2 ) 
                 {
-                    System.out.println("SPACE");
-                    
                     final List<PathFinder.PathNode> nodes = new ArrayList<>();
                     for ( Point p : marked.values() ) {
                         nodes.add( new PathFinder.PathNode( p.x , p.y ) );
                     }
+                    
                     final PathFinder.PathNode start = nodes.get(0);
                     final PathFinder.PathNode end = nodes.get(1);
   
+                    System.out.print("Searching path ...");
                     long time = -System.currentTimeMillis();
                     PathFinder.PathNode path = finder.findPath( start , end );
                     time += System.currentTimeMillis();
-                    System.out.println("Time: "+time+" ms");
+                    if ( path == null ) {
+                        System.out.println(" no path found , time: "+time+" ms");
+                    } else {
+                        System.out.println(" found ("+path.getNodeCount()+" nodes), time: "+time+" ms");
+                    }
                     
                     if ( lastPathMarkerId != null ) {
                         renderer.clearMarker( lastPathMarkerId );

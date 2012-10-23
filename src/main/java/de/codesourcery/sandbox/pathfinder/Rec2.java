@@ -36,34 +36,20 @@ public class Rec2
         return y2-y1;
     }  
     
-    public final boolean intersects(Rec2 rec) 
+    public final boolean overlap(int rx1,int ry1,int width , int height) 
     {
-        return intersects( rec.x1 , rec.x2 , rec.width() , rec.height() );
-    }
-
-    public final boolean intersects(int x,int y,int width,int height) 
+        final int rx2 = rx1 + width;
+        final int ry2 = ry1 + height;
+        
+        return ! (x2 <= rx1 || y2 <= ry1 || x1 >= rx2 || y1 >= ry2 );
+    }    
+    
+    public final boolean overlap(Rec2 r2) 
     {
-        // fully contained
-        final int px1 = x;
-        final int px2 = x+width;
-        final int py1 = y;
-        final int py2 = y+height;
-        
-        if ( x1 < px1 && x2 > px2 && y1 < py1 && y2 > py2 ) { // this rect fully encloses the other
-            return true;
-        }
-        
-        if ( px1 < x1 && px2 > x2 && py1 < y1 && py2 > y2 ) { // other rect fully encloses this one
-            return true;
-        }           
-        
-        return ( x1 >= px1 && x1 < px2 && y1 >= py1 && y1 < py2 ) ||
-               ( x2 >= px1 && x2 < px2 && y2 >= py1 && y2 < py2 ) ||
-               ( px1 >= x1 && px1 < x2 && py1 >= y1 && py1 < y2 ) ||
-               ( px2 >= x1 && px2 < x2 && py2 >= y1 && py2 < y2 );                 
+        return ! (x2 <= r2.x1 || y2 <= r2.y1 || x1 >= r2.x2 || y1 >= r2.y2 );
     }
     
-    public final boolean intersects(Vec2 p1,Vec2 p2)
+    public final boolean intersectsLine(Vec2 p1,Vec2 p2)
     {
         // Find min and max X for the segment
         int minX = p1.x;
@@ -127,7 +113,44 @@ public class Rec2
         {
             return false;
         }
+        return true;
+    }
 
+    @Override
+    public final int hashCode()
+    {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + x1;
+        result = prime * result + x2;
+        result = prime * result + y1;
+        result = prime * result + y2;
+        return result;
+    }
+
+    @Override
+    public final boolean equals(Object obj)
+    {
+        if (!(obj instanceof Rec2) ) 
+        {
+            return false;
+        }
+        
+        final Rec2 other = (Rec2) obj;
+        if (x1 != other.x1) {
+            return false;
+        }
+        if (x2 != other.x2) {
+            return false;
+        }
+        if (y1 != other.y1) {
+            return false;
+        }
+        if (y2 != other.y2) {
+            return false;
+        }
         return true;
     }    
+    
+    
 }

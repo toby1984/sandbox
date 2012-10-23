@@ -1,8 +1,8 @@
 package de.codesourcery.sandbox.pathfinder;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -132,7 +132,7 @@ public class QuadTree<T> {
         public List<QuadLeafNode<T>> getValues(Vec2 p1,Vec2 p2) 
         {
             final List<QuadLeafNode<T>> result = new ArrayList<>();
-            if ( this.intersects( p1,p2 ) ) {
+            if ( this.intersectsLine( p1,p2 ) ) {
                 getValues(p1,p2,result);
             }
             return result;
@@ -144,16 +144,16 @@ public class QuadTree<T> {
             } 
             else 
             {
-                if ( q0 != null && q0.intersects( p1,p2 ) ) {
+                if ( q0 != null && q0.intersectsLine( p1,p2 ) ) {
                     q0.getValues( p1,p2 , result );
                 }
-                if ( q1 != null && q1.intersects( p1,p2 ) ) {
+                if ( q1 != null && q1.intersectsLine( p1,p2 ) ) {
                     q1.getValues( p1,p2 , result );
                 }
-                if ( q2 != null && q2.intersects( p1,p2 ) ) {
+                if ( q2 != null && q2.intersectsLine( p1,p2 ) ) {
                     q2.getValues( p1,p2 , result );
                 }
-                if ( q3 != null && q3.intersects( p1,p2 ) ) {
+                if ( q3 != null && q3.intersectsLine( p1,p2 ) ) {
                     q3.getValues( p1,p2 , result );
                 }                
             }
@@ -163,11 +163,40 @@ public class QuadTree<T> {
         {
             return getValues( rect.x1 , rect.y1 , rect.width() , rect.height() );
         }
+        
+        public boolean containsValues(int x,int y,int width,int height) 
+        {
+            if ( isLeaf() ) {
+                return true;
+            }
+            
+            if ( ! overlap(x,y,width,height) ) {
+                return false;
+            }
+            
+            if ( q0 != null && q0.containsValues( x,y,width,height ) ) 
+            {
+                return true;
+            }
+            if ( q1 != null && q1.containsValues( x,y,width,height ) ) 
+            {
+                return true;
+            }         
+            if ( q2 != null && q2.containsValues( x,y,width,height ) ) 
+            {
+                return true;
+            }  
+            if ( q3 != null && q3.containsValues( x,y,width,height ) ) 
+            {
+                return true;
+            }              
+            return false;
+        }
 		
 		public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) 
 		{
 			final List<QuadLeafNode<T>> result = new ArrayList<>();
-	        if ( intersects( x, y, width,height ) ) { 
+	        if ( overlap( x, y, width,height ) ) { 
 	            getValues(x,y,width,height, result);
 		    }
 			return result;
@@ -185,16 +214,16 @@ public class QuadTree<T> {
 			} 
 			else 
 			{
-				if ( q0 != null && q0.intersects( x ,y, width, height ) ) {
+				if ( q0 != null && q0.overlap( x ,y, width, height ) ) {
 					q0.getValues( x , y , width , height , result );
 				}
-				if ( q1 != null && q1.intersects( x ,y, width, height ) ) {
+				if ( q1 != null && q1.overlap( x ,y, width, height ) ) {
 					q1.getValues( x , y , width , height , result );
 				}
-				if ( q2 != null && q2.intersects( x ,y, width, height ) ) {
+				if ( q2 != null && q2.overlap( x ,y, width, height ) ) {
 					q2.getValues( x , y , width , height , result );
 				}
-				if ( q3 != null && q3.intersects( x ,y, width, height ) ) {
+				if ( q3 != null && q3.overlap( x ,y, width, height ) ) {
 					q3.getValues( x , y , width , height , result );
 				}					
 			}
@@ -371,7 +400,7 @@ public class QuadTree<T> {
 	
 	public static void main(String[] args) 
 	{
-		final QuadTree<Integer> tree = new QuadTree<Integer>(1000,700);
+		final QuadTree<Integer> tree = new QuadTree<Integer>(7,5);
 		
 //		tree.store( 5 , 5 , 42 );
 //		tree.store( 5 , 7 , 43 );
@@ -383,36 +412,40 @@ public class QuadTree<T> {
 //		System.out.println("Values: "+tree.getValues(0,0,100,100) );
 //		tree.print();
 		
-//		final List<Point> p = new ArrayList<>();
-//		
-//		p.add(new Point(7,1));
-//		p.add(new Point(4,0));
-//		p.add(new Point(4,0));
-//		p.add(new Point(1,9));
-//		p.add(new Point(5,1));
-//		p.add(new Point(0,2));
-//		p.add(new Point(6,1));
-//		p.add(new Point(4,0));
-//		p.add(new Point(1,8));
-//		
-//		for ( Point x : p ) {
-//		    tree.store( x.x , x.y , 3 );
-//		}
+		final List<Point> p = new ArrayList<>();
+
+		p.add( new Point(3,1) );
+		p.add( new Point(4,1) );
+		p.add( new Point(3,2) );
+		p.add( new Point(4,2) );
+		p.add( new Point(3,3) );
+		p.add( new Point(4,3) );
 		
-		Random rnd = new Random(System.currentTimeMillis());
-		long time = -System.currentTimeMillis();
-		for ( int i = 0 ; i < 1000000 ; i++ ) {
-			final int x = rnd.nextInt( 1000 );
-			final int y = rnd.nextInt( 700 );
-			final int value = rnd.nextInt(1024);
-			tree.store( x , y , value );
-			QuadLeafNode<Integer> stored = tree.getValue( x , y );
-			if ( stored == null || stored.getValue() == null || stored.getValue().intValue() != value ) {
-				throw new RuntimeException("Read at "+x+","+y+" failed, expected "+value+" , got "+stored);
-			}
+		for ( Point x : p ) {
+		    tree.store( x.x , x.y , 3 );
 		}
-		time += System.currentTimeMillis();
-		System.out.println("Insert time: "+time+" ms");
+		
+		for ( int x = 0 ; x < 7 ; x++ ) {
+		    for ( int y = 0 ; y < 5 ; y++ ) 
+		    {
+		        System.out.println("Value( "+x+","+y+" ) = "+tree.getValues(x, y , 1, 1 ) );
+		    }
+		}
+		
+//		Random rnd = new Random(System.currentTimeMillis());
+//		long time = -System.currentTimeMillis();
+//		for ( int i = 0 ; i < 1000000 ; i++ ) {
+//			final int x = rnd.nextInt( 1000 );
+//			final int y = rnd.nextInt( 700 );
+//			final int value = rnd.nextInt(1024);
+//			tree.store( x , y , value );
+//			QuadLeafNode<Integer> stored = tree.getValue( x , y );
+//			if ( stored == null || stored.getValue() == null || stored.getValue().intValue() != value ) {
+//				throw new RuntimeException("Read at "+x+","+y+" failed, expected "+value+" , got "+stored);
+//			}
+//		}
+//		time += System.currentTimeMillis();
+//		System.out.println("Insert time: "+time+" ms");
 	}
 	
     public void store(int x,int y,int width,int height , T value) 
@@ -428,6 +461,7 @@ public class QuadTree<T> {
 	
 	public void store(int x,int y,T value) 
 	{
+	    System.out.println("p.add( new Point("+x+","+y+")");
 		try {
 			root.add( new QuadLeafNode<T>(x,y,value) );
 		} 
@@ -455,6 +489,10 @@ public class QuadTree<T> {
     public List<QuadLeafNode<T>> getValues(Vec2 p1,Vec2 p2) {
         return root.getValues(p1,p2);
     }	
+    
+    public boolean containsValues(int x,int y,int width,int height) {
+        return root.containsValues(x, y, width,height);
+    }
 	
 	public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) {
 		return root.getValues( x , y , width , height );

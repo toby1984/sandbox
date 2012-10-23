@@ -1,6 +1,6 @@
 package de.codesourcery.sandbox.pathfinder;
 
-public final class Vec2
+public class Vec2
 {
     private static final float RAD_TO_DEG = (float) ( 180.0d / Math.PI );
     
@@ -23,7 +23,7 @@ public final class Vec2
         return new Vec2( Math.round( factor*x ) , Math.round( factor*y ) );
     }
     
-    public Vec2 sub(Vec2 o) {
+    public Vec2 minus(Vec2 o) {
         return new Vec2(this.x-o.x,this.y-o.y);
     }    
     
@@ -47,13 +47,16 @@ public final class Vec2
     
     public static void main(String[] args)
     {
-        Vec2 v1 = new Vec2(1,0);
-        System.out.println("Len #1: "+v1.length());
-        Vec2 v2 = new Vec2(-1,1);
-        System.out.println("Len #2: "+v2.length());
-        System.out.println("Dot product: "+v1.dotProduct( v2 ) );
-        System.out.println("Angle (rad): "+v1.angleInRad( v2 ) );
-        System.out.println("Angle (deg): "+v1.angleInDeg( v2 ) );        
+        
+        final Vec2 target=new Vec2(10,10);
+        
+        final Vec2 current=new Vec2(5,5);
+        
+        final Vec2 movement=new Vec2(-1,0);        
+        
+        Vec2 delta = target.minus( current );
+        final float angle = movement.angleInDeg( delta );
+        System.out.println("Angle (deg): "+angle);        
     }
 
     @Override
