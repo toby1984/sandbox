@@ -23,7 +23,7 @@ public final class PathFinder
     // nodes ruled out
     private final Set<PathNode> closeList = new HashSet<>();
 
-    public static final class PathNode extends Rec2
+    public static final class PathNode extends Vec2
     {
         public final PathNode parent;
 
@@ -37,7 +37,7 @@ public final class PathFinder
 
         public PathNode(int x,int y,PathNode parent) 
         {
-            super(x,y,x+1,y+1);
+            super(x,y);
             this.parent=parent;
         }
 
@@ -51,12 +51,12 @@ public final class PathFinder
 
         public int x() 
         { 
-            return x1;
+            return x;
         }
         
         public int y() 
         {
-            return y1;
+            return y;
         }          
         
         public int getNodeCount() {
@@ -83,7 +83,7 @@ public final class PathFinder
             final StringBuilder builder = new StringBuilder();
             while ( ! stack.isEmpty() ) {
                 final PathNode pop = stack.pop();
-                builder.append( "[ "+pop.x()+" , "+pop.y()+" ("+pop.width()+" x "+pop.height()+") ]");
+                builder.append( "[ "+pop.x()+" , "+pop.y() +" ]");
                 if ( ! stack.isEmpty() ) {
                     builder.append(" -> ");
                 }

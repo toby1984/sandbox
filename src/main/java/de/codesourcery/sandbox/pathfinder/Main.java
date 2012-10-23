@@ -25,6 +25,7 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 import de.codesourcery.sandbox.pathfinder.IScene.ISceneVisitor;
+import de.codesourcery.sandbox.pathfinder.SceneRenderer.MarkerType;
 
 public class Main extends JFrame
 {
@@ -35,6 +36,8 @@ public class Main extends JFrame
     private static final boolean RENDER_GRID = WIDTH <= 100 && HEIGHT <= 100;
     
     private static final boolean THICK_SELECTION = ! RENDER_GRID;    
+    
+    private static final Color ENDPOINT_MARKER = Color.GREEN;
     
     private volatile IScene scene;
     private volatile PathFinder finder;
@@ -55,7 +58,7 @@ public class Main extends JFrame
         finder = new PathFinder( scene );
         marked.clear();
         for ( Point p : markers ) {
-            final long id = renderer.addMarker( p.x , p.y , Color.green );
+            final long id = renderer.addMarker( p.x , p.y , ENDPOINT_MARKER , MarkerType.ENDPOINT );
             marked.put( id , p );
         }
         return scene;
@@ -69,6 +72,7 @@ public class Main extends JFrame
             @Override
             public void paint(Graphics g)
             {
+            	setBackground(Color.WHITE);
                 super.paint(g);
                 renderer.renderScene(getSize() , (Graphics2D) g );
             }
@@ -112,7 +116,7 @@ public class Main extends JFrame
                         renderer.clearMarker( removedId );
                     }
                     
-                    final long markerId = renderer.addMarker( modelX , modelY , Color.GREEN );
+                    final long markerId = renderer.addMarker( modelX , modelY , ENDPOINT_MARKER , MarkerType.ENDPOINT );
                     marked.put( markerId , new Point(modelX,modelY) );
                     panel.repaint();
                 }

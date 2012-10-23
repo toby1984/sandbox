@@ -10,7 +10,7 @@ public abstract class AbstractScene implements IScene
     protected final int height;
     
     public static IScene createInstance(int width,int height) {
-        return new QuadTreeScene(width,height);
+        return new Scene(width,height);
     }
     
     protected AbstractScene(int width,int height) 

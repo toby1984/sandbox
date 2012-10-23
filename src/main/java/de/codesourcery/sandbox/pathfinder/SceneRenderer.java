@@ -29,19 +29,41 @@ public class SceneRenderer
     
     private final AtomicLong markerId = new AtomicLong(0);
     
+    public static enum MarkerType {
+    	REGULAR,
+    	ENDPOINT;
+    }
+    
     public static final class Marker 
     {
         public final long id;
         public final Color color;
         public final int x;
         public final int y;
+        private final MarkerType type;
         
-        public Marker(long id,int x, int y,Color color)
+        public Marker(long id,int x, int y,Color color,MarkerType type)
         {
             this.id=id;
             this.x = x;
             this.y = y;
             this.color = color;
+            if ( color == null ) {
+				throw new IllegalArgumentException("color must not be null");
+			}
+            this.type = type;
+            if (type == null) {
+				throw new IllegalArgumentException(
+						"type must not be null");
+			}
+        }
+        
+        public MarkerType getType() {
+			return type;
+		}
+        
+        public boolean hasType(MarkerType t) {
+        	return t.equals( type );
         }
     }
     
@@ -58,10 +80,10 @@ public class SceneRenderer
         sceneHeight = scene.getHeight();
     }
     
-    public long addMarker(int x, int y,Color color) 
+    public long addMarker(int x, int y,Color color,MarkerType type) 
     {
         final long id = markerId.incrementAndGet();
-        final Marker marker = new Marker(id , x, y, color);
+        final Marker marker = new Marker(id , x, y, color,type);
         
         synchronized( markers ) 
         {
@@ -93,13 +115,7 @@ public class SceneRenderer
         final List<Marker> l = new ArrayList<>();
         do 
         {
-//            for ( int x = current.x1 ; x < current.x2 ; x++ ) 
-//            {
-//                for ( int y = current.y1 ; y < current.y2 ; y++ ) {
-//                    l.add( new Marker(id,x,y , color ) );
-//                }
-//            }
-            l.add( new Marker(id,current.x(),current.y() , color ) );
+            l.add( new Marker(id,current.x(),current.y() , color , MarkerType.REGULAR ) );
             current = current.parent;
         } while ( current != null );
         
@@ -163,10 +179,29 @@ public class SceneRenderer
                         graphics.setColor( m.color );
                         lastColor = m.color;
                     }
-                    fillRect( m.x , m.y , xInc , yInc , graphics );
+                    if ( m.hasType(MarkerType.ENDPOINT ) ) {
+                    	drawEndpoint( m.x , m.y , xInc ,yInc , graphics );
+                    } else {
+                    	fillRect( m.x , m.y , xInc , yInc , graphics );
+                    }
                 }
             }
         }
+    }
+    
+    private void drawEndpoint(int x,int y , double xInc, double yInc , Graphics2D graphics ) {
+    	
+        final double xm = Math.floor( x * xInc );
+        final double ym = Math.floor( y * yInc );
+        
+        final double x1 = xm - 10;
+        final double x2 = xm + 10;
+        
+        final double y1 = ym - 10;
+        final double y2 = ym + 10;
+        
+        graphics.drawLine( (int) x1 , (int) ym , (int) x2 , (int) ym );
+        graphics.drawLine( (int) xm , (int) y1 , (int) xm , (int) y2 );
     }
     
     private void fillRect(int x,int y , double xInc, double yInc , Graphics2D graphics) 
