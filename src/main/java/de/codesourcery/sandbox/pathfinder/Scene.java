@@ -42,8 +42,11 @@ public final class Scene implements IScene
     @Override
     public byte read(int x, int y)
     {
-    	final Byte value = data.getValue( x , y);
-        return value == null ? IScene.FREE : value.byteValue();
+    	final QuadLeafNode<Byte> value = data.getValue( x , y);
+    	if ( value == null ) {
+    	    return IScene.FREE;
+    	}
+        return value.getValue().byteValue();
     }
 
     @Override

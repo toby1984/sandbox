@@ -1,6 +1,5 @@
 package de.codesourcery.sandbox.pathfinder;
 
-import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -15,13 +14,8 @@ public class QuadTree<T> {
 		public boolean visit(QuadNode<T> node,int currentDepth);
 	}	
 	
-	protected static class QuadNode<T> 
+	protected static class QuadNode<T> extends Rec2
 	{
-		protected final int x1;
-		protected final int y1;
-		protected final int x2;
-		protected final int y2;
-		
 		protected QuadNode<T> q0= null;
 		protected QuadNode<T> q1= null;
 		protected QuadNode<T> q2= null;
@@ -69,15 +63,7 @@ public class QuadTree<T> {
 		}
 		
 		public QuadNode(int x, int y,int width,int height) {
-			this.x1 = x;
-			this.y1 = y;
-			this.x2 = x1+width;
-			this.y2 = y1+height;
-		}
-		
-		public final boolean contains(int x,int y) {
-			return x >= x1 && x < x2 &&
-				   y >= y1 && y < y2;
+		    super(x,y,x+width,y+height);
 		}
 		
 		public final boolean visitPreOrder(IVisitor<T> v) {
@@ -109,18 +95,10 @@ public class QuadTree<T> {
 			return true;
 		}
 		
-		public final int width() {
-			return x2-x1;
-		}
-		
-		public final int height() {
-			return y2-y1;
-		}
-		
-		public T getValue(int x,int y) 
+		public final QuadLeafNode<T> getValue(int x,int y) 
 		{
-			if ( isLeaf() && this.x1 == x && this.y1 == y ) {
-				return ((QuadLeafNode<T>) this).getValue();
+			if ( isLeaf() ) {
+				return (QuadLeafNode<T>) this;
 			}
 			
 			switch ( getQuadrant( x, y ) ) 
@@ -151,62 +129,74 @@ public class QuadTree<T> {
 			return null;
 		}
 		
-		public boolean intersects(int x,int y,int width,int height) 
-		{
-			// fully contained
-			final int px1 = x;
-			final int px2 = x+width;
-			final int py1 = y;
-			final int py2 = y+height;
-			
-			if ( x1 < px1 && x2 > px2 && y1 < py1 && y2 > py2 ) { // this rect fully encloses the other
-				return true;
-			}
-			
-			if ( px1 < x1 && px2 > x2 && py1 < y1 && py2 > y2 ) { // other rect fully encloses this one
-				return true;
-			}			
-			
-			return ( x1 >= px1 && x1 < px2 && y1 >= py1 && y1 < py2 ) ||
-				   ( x2 >= px1 && x2 < px2 && y2 >= py1 && y2 < py2 ) ||
-				   ( px1 >= x1 && px1 < x2 && py1 >= y1 && py1 < y2 ) ||
-				   ( px2 >= x1 && px2 < x2 && py2 >= y1 && py2 < y2 );				   
-		}
+        public List<QuadLeafNode<T>> getValues(Vec2 p1,Vec2 p2) 
+        {
+            final List<QuadLeafNode<T>> result = new ArrayList<>();
+            if ( this.intersects( p1,p2 ) ) {
+                getValues(p1,p2,result);
+            }
+            return result;
+        }		
+        
+        private void getValues(Vec2 p1,Vec2 p2,List<QuadLeafNode<T>> result) {
+            if ( isLeaf() ) {
+                result.add( (QuadLeafNode<T>) this);
+            } 
+            else 
+            {
+                if ( q0 != null && q0.intersects( p1,p2 ) ) {
+                    q0.getValues( p1,p2 , result );
+                }
+                if ( q1 != null && q1.intersects( p1,p2 ) ) {
+                    q1.getValues( p1,p2 , result );
+                }
+                if ( q2 != null && q2.intersects( p1,p2 ) ) {
+                    q2.getValues( p1,p2 , result );
+                }
+                if ( q3 != null && q3.intersects( p1,p2 ) ) {
+                    q3.getValues( p1,p2 , result );
+                }                
+            }
+        }
+		
+        public List<QuadLeafNode<T>> getValues(Rec2 rect) 
+        {
+            return getValues( rect.x1 , rect.y1 , rect.width() , rect.height() );
+        }
 		
 		public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) 
 		{
 			final List<QuadLeafNode<T>> result = new ArrayList<>();
-			getValues(x,y,width,height, result);
+	        if ( intersects( x, y, width,height ) ) { 
+	            getValues(x,y,width,height, result);
+		    }
 			return result;
 		}
 		
 		private void getValues(int x,int y,int width,int height,List<QuadLeafNode<T>> result) 
 		{
-			if ( this.intersects( x, y, width,height ) ) 
+			if ( isLeaf() ) 
 			{
-				if ( isLeaf() ) 
-				{
-					final QuadLeafNode<T> leaf = (QuadLeafNode<T>) this;
-					T v = leaf.getValue();
-					if ( v!= null ) {
-						result.add( leaf );
-					}
-				} 
-				else 
-				{
-					if ( q0 != null ) {
-						q0.getValues( x , y , width , height , result );
-					}
-					if ( q1 != null ) {
-						q1.getValues( x , y , width , height , result );
-					}
-					if ( q2 != null ) {
-						q2.getValues( x , y , width , height , result );
-					}
-					if ( q3 != null ) {
-						q3.getValues( x , y , width , height , result );
-					}					
+				final QuadLeafNode<T> leaf = (QuadLeafNode<T>) this;
+				T v = leaf.getValue();
+				if ( v!= null ) {
+					result.add( leaf );
 				}
+			} 
+			else 
+			{
+				if ( q0 != null && q0.intersects( x ,y, width, height ) ) {
+					q0.getValues( x , y , width , height , result );
+				}
+				if ( q1 != null && q1.intersects( x ,y, width, height ) ) {
+					q1.getValues( x , y , width , height , result );
+				}
+				if ( q2 != null && q2.intersects( x ,y, width, height ) ) {
+					q2.getValues( x , y , width , height , result );
+				}
+				if ( q3 != null && q3.intersects( x ,y, width, height ) ) {
+					q3.getValues( x , y , width , height , result );
+				}					
 			}
 		}
 		
@@ -269,9 +259,9 @@ public class QuadTree<T> {
 		{
 			if ( isLeaf() ) 
 			{
-				if ( x1 != node.x1 || y1 != node.x2 ) 
+				if ( ! this.matches( node ) )
 				{
-					throw new IllegalStateException("Unreachable code reached");
+					throw new IllegalStateException("Node "+this+" already occupied, can't set "+node);
 				}
 				((QuadLeafNode<T>) this).setValue( node.getValue() );
 				return;				
@@ -279,7 +269,6 @@ public class QuadTree<T> {
 			
 			final int quadrant = getQuadrant( node );
 			if ( quadrant == -1 ) {
-				
 				throw new RuntimeException("Internal error, node "+this+" does not contain "+node);
 			}
 			
@@ -297,13 +286,13 @@ public class QuadTree<T> {
 			}
 			
 			// we already got a leaf at the quadrant we want to insert 
-			if ( child.x1 == node.x1 && child.y1 == node.y1 ) 
+			if ( child.matches( node ) )
 			{
 				((QuadLeafNode<T>) child).setValue( node.getValue() );
 				return;
 			}
 			
-			// split child
+			// split quadrant
 			final int w = width();
 			final int h = height();
 			
@@ -347,9 +336,14 @@ public class QuadTree<T> {
 		private T value;
 		
 		public QuadLeafNode(int x, int y, T value) {
-			super(x, y, 1, 1);
-			this.value = value;
+            super(x, y, 1, 1 );
+            this.value = value;		    
 		}
+		
+        public QuadLeafNode(int x, int y, int width,int height,T value) {
+            super(x, y, width, height );
+            this.value = value;
+        }		
 
 		public T getValue() {
 			return value;
@@ -412,14 +406,25 @@ public class QuadTree<T> {
 			final int y = rnd.nextInt( 700 );
 			final int value = rnd.nextInt(1024);
 			tree.store( x , y , value );
-			Integer stored = tree.getValue( x , y );
-			if ( stored == null || stored.intValue() != value ) {
+			QuadLeafNode<Integer> stored = tree.getValue( x , y );
+			if ( stored == null || stored.getValue() == null || stored.getValue().intValue() != value ) {
 				throw new RuntimeException("Read at "+x+","+y+" failed, expected "+value+" , got "+stored);
 			}
 		}
 		time += System.currentTimeMillis();
 		System.out.println("Insert time: "+time+" ms");
 	}
+	
+    public void store(int x,int y,int width,int height , T value) 
+    {
+        try {
+            root.add( new QuadLeafNode<T>(x,y,width,height,value) );
+        } 
+        catch(RuntimeException e) {
+            root.print();
+            throw e;
+        }
+    }
 	
 	public void store(int x,int y,T value) 
 	{
@@ -432,9 +437,24 @@ public class QuadTree<T> {
 		}
 	}
 	
-	public T getValue(int x,int y) {
-		return root.getValue(x,y);
+	/**
+	 * Returns the value closest to a given point.
+	 * 
+	 * @param x
+	 * @param y
+	 * @return
+	 */
+	public QuadLeafNode<T> getValue(int x,int y) {
+	    return root.getValue(x,y);
 	}
+	
+	public List<QuadLeafNode<T>> getValues(Rec2 rect) {
+	    return root.getValues(rect);
+	}
+	
+    public List<QuadLeafNode<T>> getValues(Vec2 p1,Vec2 p2) {
+        return root.getValues(p1,p2);
+    }	
 	
 	public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) {
 		return root.getValues( x , y , width , height );
