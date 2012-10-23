@@ -18,6 +18,8 @@ public class SceneRenderer
     private final int sceneWidth;
     private final int sceneHeight;
     
+    private boolean renderGrid = false;
+    
     // @GuardedBy( "markers" )
     private final Map<Long,List<Marker>> markers = new HashMap<>();
     
@@ -37,6 +39,11 @@ public class SceneRenderer
             this.y = y;
             this.color = color;
         }
+    }
+    
+    public void setRenderGrid(boolean renderGrid)
+    {
+        this.renderGrid = renderGrid;
     }
     
     protected SceneRenderer(IScene scene)
@@ -96,35 +103,38 @@ public class SceneRenderer
         final int screenWidth = canvas.width;
         final int screenHeight = canvas.height;
         
-        final int xInc = screenWidth / sceneWidth;
-        final int yInc = screenHeight / sceneHeight;
+        final double xInc = screenWidth / (double) sceneWidth;
+        final double yInc = screenHeight / (double) sceneHeight;
 
-        final int xMax = sceneWidth * xInc;
-        final int yMax = sceneHeight * yInc;
-        
+        final int xMax = (int) Math.round( sceneWidth * xInc );
+        final int yMax = (int) Math.round( sceneHeight * yInc );
+
         graphics.setColor(Color.RED);
-        
-        // draw grid Y
-        for ( int x = 0 ; x < sceneWidth ; x+=1) 
+
+        if ( renderGrid ) 
         {
-            final int currentX=x*xInc ;
-            graphics.drawLine( currentX, 0 , currentX, yMax);
+            // draw grid Y
+            for ( int x = 0 ; x < sceneWidth ; x+=1) 
+            {
+                final int currentX=(int) Math.round(x*xInc);
+                graphics.drawLine( currentX, 0 , currentX, yMax);
+            }
+            
+            // draw grid X
+            for ( int y = 0 ; y < sceneHeight ; y+=1) 
+            {
+                final int currentY= (int) Math.round(y*yInc);
+                graphics.drawLine( 0, currentY , xMax  , currentY );
+            }        
         }
         
-        // draw grid X
-        for ( int y = 0 ; y < sceneHeight ; y+=1) 
-        {
-            final int currentY=y*yInc ;
-            graphics.drawLine( 0, currentY , xMax  , currentY );
-        }        
-        
         // draw grid
-        
         final ISceneVisitor visitor = new ISceneVisitor() {
 			
 			@Override
-			public void visit(int x, int y, byte cellStatus) {
-                graphics.fillRect( x * xInc,y * yInc , xInc , yInc );				
+			public void visit(int x, int y, byte cellStatus) 
+			{
+                graphics.fillRect( (int) Math.round(x * xInc),(int) Math.round( y * yInc ), (int) Math.round(xInc), (int) Math.round(yInc) );				
 			}
 		};
 		scene.visitOccupiedCells( visitor );
@@ -141,19 +151,19 @@ public class SceneRenderer
                         graphics.setColor( m.color );
                         lastColor = m.color;
                     }
-                    graphics.fillRect( m.x * xInc, m.y * yInc , xInc , yInc );
+                    graphics.fillRect( (int) Math.round(m.x * xInc), (int) Math.round(m.y * yInc) , (int) Math.round(xInc) , (int) Math.round(yInc) );
                 }
             }
         }
     }
     
     public int viewXToModel(int viewX,Dimension canvas) {
-        final int xInc = canvas.width / sceneWidth;
-        return viewX / xInc;
+        final double xInc = canvas.width / (double) sceneWidth;
+        return (int) Math.round( viewX / xInc );
     }
     
     public int viewYToModel(int viewY,Dimension canvas) {
-        final int yInc = canvas.height / sceneHeight;
-        return viewY / yInc;
+        final double yInc = canvas.height / (double) sceneHeight;
+        return (int) Math.round( viewY / yInc );
     }    
 }

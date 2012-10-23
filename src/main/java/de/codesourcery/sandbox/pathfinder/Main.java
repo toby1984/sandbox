@@ -24,6 +24,9 @@ import de.codesourcery.sandbox.pathfinder.IScene.ISceneVisitor;
 
 public class Main extends JFrame
 {
+    private static final int WIDTH = 1000;
+    private static final int HEIGHT = 700;
+    
     private volatile IScene scene;
     private volatile PathFinder finder;
     private volatile SceneRenderer renderer;    
@@ -45,7 +48,7 @@ public class Main extends JFrame
     
     public void run() throws IOException
     {
-        setup(500,400);
+        setup(WIDTH,HEIGHT);
         
         final File tmpFile = new File("/tmp/scene.bin");
         final JPanel panel = new JPanel() {
@@ -110,13 +113,63 @@ public class Main extends JFrame
                     
                     if ( lastX != modelX || lastY != modelY ) 
                     {
+                        if ( lastX != -1 ) {
+                            markLine(lastX,lastY , modelX , modelY );
+                        } else {
+                            setDot( modelX,modelY );                            
+                        }
+                        
                         lastX = modelX;
                         lastY = modelY;
-//                        final byte newValue = scene.read(modelX,modelY) == IScene.FREE ? IScene.OCCUPIED : IScene.FREE;
-                        scene.write( modelX,modelY , IScene.OCCUPIED );
+                        
                         panel.repaint();
                     }
                 }               
+            }
+            
+            private void setDot(int x,int y) {
+                
+                scene.write( x,y , IScene.OCCUPIED );
+                
+                final boolean notAtRightBorder = x+1 < scene.getWidth();
+                final boolean notAtBottomBorder = y+1 < scene.getHeight();
+                
+                if ( notAtRightBorder ) 
+                {
+                    scene.write( x+1,y , IScene.OCCUPIED );
+                }
+                
+                if (notAtBottomBorder ) 
+                {
+                    scene.write( x,y+1 , IScene.OCCUPIED );
+                }     
+                
+                if ( notAtRightBorder && notAtBottomBorder ) {
+                    scene.write( x+1,y+1 , IScene.OCCUPIED );
+                }
+            }
+            
+            private void markLine(int x1,int y1,int x2,int y2) {
+                
+                int x = x1;
+                int y = y1;
+                while (true ) 
+                {
+                    setDot( x,y );
+                    if ( x == x2 && y == y2 ) {
+                        return;
+                    }
+                    if ( x < x2 ) {
+                        x++;
+                    } else if ( x > x2 ) {
+                        x--;
+                    }
+                    if ( y < y2 ) {
+                        y++;
+                    } else if ( y > y2 ) {
+                        y--;
+                    }
+                } 
             }
             
         };

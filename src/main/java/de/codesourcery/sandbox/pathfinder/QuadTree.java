@@ -1,37 +1,38 @@
 package de.codesourcery.sandbox.pathfinder;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 import org.apache.commons.lang.StringUtils;
 
-public class BSP<T> {
+public class QuadTree<T> {
 
-	private BSPNode<T> root;
+	private QuadNode<T> root;
 	
 	public interface IVisitor<T> {
-		public boolean visit(BSPNode<T> node,int currentDepth);
+		public boolean visit(QuadNode<T> node,int currentDepth);
 	}	
 	
-	protected static class BSPNode<T> 
+	protected static class QuadNode<T> 
 	{
 		protected final int x1;
 		protected final int y1;
 		protected final int x2;
 		protected final int y2;
 		
-		protected BSPNode<T> q0= null;
-		protected BSPNode<T> q1= null;
-		protected BSPNode<T> q2= null;
-		protected BSPNode<T> q3= null;
+		protected QuadNode<T> q0= null;
+		protected QuadNode<T> q1= null;
+		protected QuadNode<T> q2= null;
+		protected QuadNode<T> q3= null;
 		
 		@Override
 		public String toString() {
 			return "BSPNode [ x=" + x1 + ", y = "+y1+" , width=" + width()+ ", height=" + height() +"]";
 		}
 
-		protected final BSPNode<T> getChild(int quadrant) 
+		protected final QuadNode<T> getChild(int quadrant) 
 		{
 			switch(quadrant) {
 				case 0:
@@ -47,7 +48,7 @@ public class BSP<T> {
 			}
 		}
 		
-		protected final void setChild(int quadrant,BSPNode<T> child) 
+		protected final void setChild(int quadrant,QuadNode<T> child) 
 		{
 			switch(quadrant) {
 				case 0:
@@ -67,7 +68,7 @@ public class BSP<T> {
 			}			
 		}
 		
-		public BSPNode(int x, int y,int width,int height) {
+		public QuadNode(int x, int y,int width,int height) {
 			this.x1 = x;
 			this.y1 = y;
 			this.x2 = x1+width;
@@ -119,7 +120,7 @@ public class BSP<T> {
 		public T getValue(int x,int y) 
 		{
 			if ( isLeaf() && this.x1 == x && this.y1 == y ) {
-				return ((BSPLeafNode<T>) this).getValue();
+				return ((QuadLeafNode<T>) this).getValue();
 			}
 			
 			switch ( getQuadrant( x, y ) ) 
@@ -172,20 +173,20 @@ public class BSP<T> {
 				   ( px2 >= x1 && px2 < x2 && py2 >= y1 && py2 < y2 );				   
 		}
 		
-		public List<BSPLeafNode<T>> getValues(int x,int y,int width,int height) 
+		public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) 
 		{
-			final List<BSPLeafNode<T>> result = new ArrayList<>();
+			final List<QuadLeafNode<T>> result = new ArrayList<>();
 			getValues(x,y,width,height, result);
 			return result;
 		}
 		
-		private void getValues(int x,int y,int width,int height,List<BSPLeafNode<T>> result) 
+		private void getValues(int x,int y,int width,int height,List<QuadLeafNode<T>> result) 
 		{
 			if ( this.intersects( x, y, width,height ) ) 
 			{
 				if ( isLeaf() ) 
 				{
-					final BSPLeafNode<T> leaf = (BSPLeafNode<T>) this;
+					final QuadLeafNode<T> leaf = (QuadLeafNode<T>) this;
 					T v = leaf.getValue();
 					if ( v!= null ) {
 						result.add( leaf );
@@ -214,7 +215,7 @@ public class BSP<T> {
 			final IVisitor<T> visitor = new IVisitor<T>() {
 
 				@Override
-				public boolean visit(BSPNode<T> node, int currentDepth) 
+				public boolean visit(QuadNode<T> node, int currentDepth) 
 				{
 					final int indent = currentDepth*4;
 					System.out.println( StringUtils.repeat(" ", indent)+node);
@@ -225,7 +226,7 @@ public class BSP<T> {
 			visitPreOrder( visitor );
 		}		
 		
-		private int getQuadrant(BSPNode<T> node) 
+		private int getQuadrant(QuadNode<T> node) 
 		{
 			return getQuadrant( node.x1 , node.y1 );
 		}
@@ -264,7 +265,7 @@ public class BSP<T> {
 			return -1;
 		}
 		
-		public void add(BSPLeafNode<T> node) 
+		public void add(QuadLeafNode<T> node) 
 		{
 			if ( isLeaf() ) 
 			{
@@ -272,7 +273,7 @@ public class BSP<T> {
 				{
 					throw new IllegalStateException("Unreachable code reached");
 				}
-				((BSPLeafNode<T>) this).setValue( node.getValue() );
+				((QuadLeafNode<T>) this).setValue( node.getValue() );
 				return;				
 			}
 			
@@ -282,7 +283,7 @@ public class BSP<T> {
 				throw new RuntimeException("Internal error, node "+this+" does not contain "+node);
 			}
 			
-			final BSPNode<T> child = getChild(quadrant);
+			final QuadNode<T> child = getChild(quadrant);
 			if ( child == null ) 
 			{
 				setChild(quadrant , node );
@@ -298,7 +299,7 @@ public class BSP<T> {
 			// we already got a leaf at the quadrant we want to insert 
 			if ( child.x1 == node.x1 && child.y1 == node.y1 ) 
 			{
-				((BSPLeafNode<T>) child).setValue( node.getValue() );
+				((QuadLeafNode<T>) child).setValue( node.getValue() );
 				return;
 			}
 			
@@ -310,29 +311,29 @@ public class BSP<T> {
 			final int deltaWidth = w - newWidth*2;
 			
 			final int newHeight = h > 1 ? h / 2 : h;
-			final int deltaHeight = w - newHeight*2;
+			final int deltaHeight = h - newHeight*2;
 			
-			final BSPNode<T> newNode;
+			final QuadNode<T> newNode;
 			switch( quadrant )
 			{
 				case 0:
-					newNode = new BSPNode<T>(x1,y1,newWidth,newHeight);
+					newNode = new QuadNode<T>(x1,y1,newWidth,newHeight);
 					break;
 				case 1:
-					newNode = new BSPNode<T>(x1+newWidth,y1,newWidth+deltaWidth,newHeight);
+					newNode = new QuadNode<T>(x1+newWidth,y1,newWidth+deltaWidth,newHeight);
 					break;
 				case 2:
-					newNode = new BSPNode<T>(x1,y1+newHeight,newWidth,newHeight+deltaHeight);
+					newNode = new QuadNode<T>(x1,y1+newHeight,newWidth,newHeight+deltaHeight);
 					break;
 				case 3:
-					newNode = new BSPNode<T>(x1+newWidth,y1+newHeight,newWidth+deltaWidth,newHeight+deltaHeight);
+					newNode = new QuadNode<T>(x1+newWidth,y1+newHeight,newWidth+deltaWidth,newHeight+deltaHeight);
 					break;
 				default:
 					throw new IllegalStateException("Unreachable code reached");
 			}
 			
 			setChild(quadrant,newNode);
-			newNode.add( (BSPLeafNode<T>) child );
+			newNode.add( (QuadLeafNode<T>) child );
 			newNode.add( node );
 		}
 		
@@ -341,11 +342,11 @@ public class BSP<T> {
 		}
 	}
 	
-	protected static final class BSPLeafNode<T> extends BSPNode<T> {
+	protected static final class QuadLeafNode<T> extends QuadNode<T> {
 
 		private T value;
 		
-		public BSPLeafNode(int x, int y, T value) {
+		public QuadLeafNode(int x, int y, T value) {
 			super(x, y, 1, 1);
 			this.value = value;
 		}
@@ -369,14 +370,14 @@ public class BSP<T> {
 		} 
 	}
 	
-	public BSP(int width,int height) 
+	public QuadTree(int width,int height) 
 	{
-		root = new BSPNode<T>( 0 , 0 , width , height );
+		root = new QuadNode<T>( 0 , 0 , width , height );
 	}
 	
 	public static void main(String[] args) 
 	{
-		final BSP<Integer> tree = new BSP<Integer>(1024,1024);
+		final QuadTree<Integer> tree = new QuadTree<Integer>(1000,700);
 		
 //		tree.store( 5 , 5 , 42 );
 //		tree.store( 5 , 7 , 43 );
@@ -388,11 +389,27 @@ public class BSP<T> {
 //		System.out.println("Values: "+tree.getValues(0,0,100,100) );
 //		tree.print();
 		
+//		final List<Point> p = new ArrayList<>();
+//		
+//		p.add(new Point(7,1));
+//		p.add(new Point(4,0));
+//		p.add(new Point(4,0));
+//		p.add(new Point(1,9));
+//		p.add(new Point(5,1));
+//		p.add(new Point(0,2));
+//		p.add(new Point(6,1));
+//		p.add(new Point(4,0));
+//		p.add(new Point(1,8));
+//		
+//		for ( Point x : p ) {
+//		    tree.store( x.x , x.y , 3 );
+//		}
+		
 		Random rnd = new Random(System.currentTimeMillis());
 		long time = -System.currentTimeMillis();
-		for ( int i = 0 ; i < 100000 ; i++ ) {
-			final int x = rnd.nextInt( 1024 );
-			final int y = rnd.nextInt( 1024 );
+		for ( int i = 0 ; i < 1000000 ; i++ ) {
+			final int x = rnd.nextInt( 1000 );
+			final int y = rnd.nextInt( 700 );
 			final int value = rnd.nextInt(1024);
 			tree.store( x , y , value );
 			Integer stored = tree.getValue( x , y );
@@ -407,8 +424,9 @@ public class BSP<T> {
 	public void store(int x,int y,T value) 
 	{
 		try {
-			root.add( new BSPLeafNode<T>(x,y,value) );
-		} catch(RuntimeException e) {
+			root.add( new QuadLeafNode<T>(x,y,value) );
+		} 
+		catch(RuntimeException e) {
 			root.print();
 			throw e;
 		}
@@ -418,7 +436,7 @@ public class BSP<T> {
 		return root.getValue(x,y);
 	}
 	
-	public List<BSPLeafNode<T>> getValues(int x,int y,int width,int height) {
+	public List<QuadLeafNode<T>> getValues(int x,int y,int width,int height) {
 		return root.getValues( x , y , width , height );
 	}
 	

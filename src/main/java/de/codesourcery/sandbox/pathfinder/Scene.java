@@ -7,13 +7,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import de.codesourcery.sandbox.pathfinder.BSP.BSPLeafNode;
-import de.codesourcery.sandbox.pathfinder.BSP.BSPNode;
-import de.codesourcery.sandbox.pathfinder.BSP.IVisitor;
+import de.codesourcery.sandbox.pathfinder.QuadTree.QuadLeafNode;
+import de.codesourcery.sandbox.pathfinder.QuadTree.QuadNode;
+import de.codesourcery.sandbox.pathfinder.QuadTree.IVisitor;
 
 public final class Scene implements IScene
 {
-    private final BSP<Byte> data;
+    private final QuadTree<Byte> data;
     private final int width;
     private final int height;
     
@@ -24,7 +24,7 @@ public final class Scene implements IScene
         }
         this.width = width;
         this.height = height;
-        this.data = new BSP<Byte>( width , height );
+        this.data = new QuadTree<Byte>( width , height );
     }
     
     @Override
@@ -64,10 +64,10 @@ public final class Scene implements IScene
     	final IVisitor<Byte> visitor = new IVisitor<Byte>() {
 
 			@Override
-			public boolean visit(BSPNode<Byte> node, int currentDepth) 
+			public boolean visit(QuadNode<Byte> node, int currentDepth) 
 			{
 				if ( node.isLeaf() ) {
-					Byte value = ((BSPLeafNode<Byte>) node).getValue();
+					Byte value = ((QuadLeafNode<Byte>) node).getValue();
 					cellVisitor.visit( node.x1 , node.y1 , value == null ? IScene.FREE : Byte.valueOf( value ) );
 				}
 				return true;
