@@ -1,5 +1,9 @@
 package de.codesourcery.sandbox.pathfinder;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class Rec2
 {
     public final int x1;
@@ -23,6 +27,80 @@ public class Rec2
         this.y2 = y2;
     }
     
+    public boolean isAdjactant(Rec2 other) 
+    {
+        if (other.y2 + 1 == y1) { // 1
+            
+            return this.x1 >= other.x1 && this.x1 < other.x2 ||
+                    this.x2 >= other.x1 && this.x2 < other.x2 ||
+                    other.x1 >= this.x1 && other.x1 < this.x2 ||
+                    other.x2 >= this.x1 && other.x2 < this.x2 ||
+        }        
+        
+        if (other.x1 -1 == x2) { // 2
+            
+        }
+
+        if (other.y1 - 1 == y2) { // 3
+            
+        }   
+        if (other.x2 +1 == x1) { // 4
+            
+        }        
+        return  false;
+    }
+    
+    public Rec2 plus(Rec2 other) 
+    {
+        final int minX = x1 < other.x1 ? x1 : other.x1;
+        final int minY = y1 < other.y1 ? y1 : other.y1;
+        
+        final int maxX = x2 > other.x2 ? x2 : other.x2;
+        final int maxY = y2 > other.y2 ? y2 : other.y2;            
+        return new Rec2(minX,minY,maxX,maxY);
+    }
+    
+    public List<Rec2> minus(Rec2 other) 
+    {
+        if ( ! overlap( other ) ) {
+            return Collections.emptyList();
+        }
+        
+        if ( ! completelyContains( other ) ) {
+            throw new IllegalArgumentException("Not completely contained: "+other+" IN "+this);
+        }
+        
+        final Rec2 r1 = createRectIfNotEmpty( x1 , y1 , x2 , other.y1 );
+        final Rec2 r2 = createRectIfNotEmpty( x1 , other.y2 , x2 , y2 );
+        final Rec2 r3 = createRectIfNotEmpty( x1 , other.y1 , other.x1 , other.y2 );
+        final Rec2 r4 = createRectIfNotEmpty( other.x2 , other.y1 , x2 , other.y2 );
+        
+        final List<Rec2> result = new ArrayList<>();
+        if (r1 != null ) { result.add( r1 ); }
+        if (r2 != null ) { result.add( r2 ); }
+        if (r3 != null ) { result.add( r3 ); }
+        if (r4 != null ) { result.add( r4 ); }
+        return result;
+    }
+    
+    private static Rec2 createRectIfNotEmpty(int x1,int y1,int x2,int y2) {
+        if ( x1 == x2 || y1 == y2 ) {
+            return null;
+        }
+        
+        final int minX = x1 < x2 ? x1 : x2;
+        final int minY = y1 < y2 ? y1 : y2;
+        
+        final int maxX = x1 > x2 ? x1 : x2;
+        final int maxY = y1 > y2 ? y1 : y2;        
+        
+        return new Rec2(minX,minY,maxX,maxY);
+    }
+    
+    public boolean isEmpty() {
+        return x1 == x2 || y1 == y2;
+    }
+    
     public final boolean matches(Rec2 other) {
         return this.x1 == other.x1 && this.x2 == other.x2 && this.y1 == other.y1 && this.y2 == other.y2;
     }
@@ -32,6 +110,10 @@ public class Rec2
                y >= y1 && y < y2;
     }    
 
+    public boolean completelyContains(Rec2 other) {
+        return x1 <= other.x1 && y1 <= other.y1 && x2 >= other.x2 && y2 >= other.y2;
+    }
+    
     public final boolean contains(Vec2 v) {
         return v.x >= x1 && v.x < x2 && v.y >= y1 && v.y < y2;
     }
@@ -43,6 +125,10 @@ public class Rec2
     public final int height() {
         return y2-y1;
     }  
+    
+    public int getArea() {
+        return width()*height();
+    }
     
     public final boolean overlap(int rx1,int ry1,int width , int height) 
     {

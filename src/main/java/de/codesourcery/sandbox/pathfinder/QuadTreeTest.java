@@ -22,10 +22,12 @@ import de.codesourcery.sandbox.pathfinder.QuadTree.QuadNode;
 
 public class QuadTreeTest {
 
-	private static final int MODEL_WIDTH = 400;
-	private static final int MODEL_HEIGHT = 600;
+	private static final int MODEL_WIDTH = 100;
+	private static final int MODEL_HEIGHT = 100;
 
-	private final QuadTree<Byte> tree= new QuadTree<Byte>(MODEL_WIDTH , MODEL_HEIGHT);
+	private final QuadTree<Byte> regularTree= new QuadTree<Byte>(MODEL_WIDTH , MODEL_HEIGHT);
+	private QuadTree<Byte> treeToRender=regularTree;
+    private QuadTree<Byte> invertedTree=null;
 
 	public static void main(String[] args) 
 	{
@@ -36,13 +38,13 @@ public class QuadTreeTest {
 	{
 		final MyPanel panel = new MyPanel();
 		
-		Random rnd = new Random(System.currentTimeMillis());
-		for ( int i = 0 ; i < 1000 ; i++ ) 
-		{
-			int x = rnd.nextInt(MODEL_WIDTH);
-			int y = rnd.nextInt(MODEL_HEIGHT);
-			tree.store( x,y,(byte)1);
-		}
+//		Random rnd = new Random(System.currentTimeMillis());
+//		for ( int i = 0 ; i < 1000 ; i++ ) 
+//		{
+//			int x = rnd.nextInt(MODEL_WIDTH);
+//			int y = rnd.nextInt(MODEL_HEIGHT);
+//			regularTree.store( x,y,(byte)1);
+//		}
 
 		panel.setPreferredSize(new Dimension(MODEL_WIDTH,MODEL_HEIGHT));
 
@@ -51,8 +53,7 @@ public class QuadTreeTest {
 			public void mouseClicked(java.awt.event.MouseEvent e) 
 			{
 				final Point p = panel.viewToModel( e.getX() , e.getY() );
-				System.out.println("Store: "+p);
-				tree.store( p.x,p.y, (byte) 1 );
+				regularTree.store( p.x,p.y, 20,20,(byte) 1 );
 				panel.repaint();
 			};
 		} );  
@@ -69,7 +70,7 @@ public class QuadTreeTest {
 					final Rec2 rect = panel.viewToModel( selection);
 					
 					long time1 = -System.currentTimeMillis();
-					final List<QuadLeafNode<Byte>> nodes = tree.getValues( rect );
+					final List<QuadLeafNode<Byte>> nodes = regularTree.getValues( rect );
 					time1 += System.currentTimeMillis();
 					
 					System.out.println("Selection time: "+time1);
@@ -188,26 +189,61 @@ public class QuadTreeTest {
 			xInc = getWidth() / (double) MODEL_WIDTH;
 			yInc = getHeight() / (double) MODEL_HEIGHT;
 
-			final IVisitor<Byte> visitor = new IVisitor<Byte>() {
+            renderLeafNodes(graphics);			
+			renderNonLeafNodes(graphics);
+		}
+
+        private void renderLeafNodes(final Graphics2D graphics)
+        {
+            final IVisitor<Byte> visitor = new IVisitor<Byte>() {
 
 				@Override
 				public boolean visit(QuadNode<Byte> node, int currentDepth) 
 				{
 					if ( node.isLeaf() ) 
 					{
-						// render leaf
+			            graphics.setColor( Color.RED ); 					    
 						renderLeaf(graphics, node);
-					} else { 
-						// render non-leaf
-						graphics.setColor( Color.BLUE );
-						renderBox(  node , graphics );
-					}
+					} 
 					return true;
 				}
 			};
+			treeToRender.visitPreOrder( visitor );
+        }
+        
+        private final Random rnd = new Random(System.currentTimeMillis());
+        
+        private Color randomColor() 
+        {
+            do {
+                int r = rnd.nextInt(256);
+                int g = rnd.nextInt(256);
+                int b = rnd.nextInt(256);
+                double dist = Math.sqrt(r*r+g*g+b*b);
+                if ( dist > 36.65 ) {
+                    return new Color(r,g,b);
+                }
+            } while ( true );
+        }
+        
+        private void renderNonLeafNodes(final Graphics2D graphics)
+        {
+            final IVisitor<Byte> visitor = new IVisitor<Byte>() {
 
-			tree.visitPreOrder( visitor );
-		}
+                @Override
+                public boolean visit(QuadNode<Byte> node, int currentDepth) 
+                {
+                    if ( ! node.isLeaf() ) 
+                    {
+                        renderBox(  node , graphics );
+                    }
+                    return true;
+                }
+            };
+
+            graphics.setColor( Color.BLUE );
+            treeToRender.visitPreOrder( visitor );
+        }        
 		
 		public void markLeaf(QuadNode<Byte> node) 
 		{
@@ -218,8 +254,11 @@ public class QuadTreeTest {
 		
 		private void renderLeaf(final Graphics2D graphics,QuadNode<Byte> node) 
 		{
-			graphics.setColor( Color.RED );
-			renderCircle( modelToView( node.x1 , node.y1 ) , 10 , graphics );
+//			if ( node.getArea() <= 1 ) {
+//			    renderCircle( modelToView( node.x1 , node.y1 ) , 10 , graphics );
+//			} else {
+			    renderFilledBox( node , graphics );
+//			}
 		}		
 		
 		private void renderBox(QuadNode<Byte> node,Graphics2D graphics) 
@@ -229,10 +268,22 @@ public class QuadTreeTest {
 			double viewHeight = node.height() * yInc;
 			renderBox( p , (int) viewWidth , (int) viewHeight , graphics );
 		}
+		
+        private void renderFilledBox(QuadNode<Byte> node,Graphics2D graphics) 
+        {
+            Point p = modelToView( node.x1 , node.y1 );
+            double viewWidth = node.width() * xInc;
+            double viewHeight = node.height() * yInc;
+            renderFilledBox( p , (int) viewWidth , (int) viewHeight , graphics );
+        }		
 
 		private void renderBox(Point p1 , int width,int height,Graphics2D graphics) {
 			graphics.drawRect( p1.x , p1.y , width , height );
 		}
+		
+        private void renderFilledBox(Point p1 , int width,int height,Graphics2D graphics) {
+            graphics.fillRect( p1.x , p1.y , width , height );
+        }		
 		
 		private void renderCircle(Point p1,int radius,Graphics2D graphics) 
 		{
