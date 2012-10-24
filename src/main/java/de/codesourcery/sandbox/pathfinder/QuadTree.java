@@ -14,7 +14,7 @@ public class QuadTree<T> {
 		public boolean visit(QuadNode<T> node,int currentDepth);
 	}	
 	
-	protected static class QuadNode<T> extends Rec2
+	public static class QuadNode<T> extends Rec2
 	{
 		protected QuadNode<T> q0= null;
 		protected QuadNode<T> q1= null;
@@ -360,7 +360,7 @@ public class QuadTree<T> {
 		}
 	}
 	
-	protected static final class QuadLeafNode<T> extends QuadNode<T> {
+	public static final class QuadLeafNode<T> extends QuadNode<T> {
 
 		private T value;
 		
@@ -461,7 +461,6 @@ public class QuadTree<T> {
 	
 	public void store(int x,int y,T value) 
 	{
-	    System.out.println("p.add( new Point("+x+","+y+")");
 		try {
 			root.add( new QuadLeafNode<T>(x,y,value) );
 		} 
@@ -500,5 +499,9 @@ public class QuadTree<T> {
 	
 	public void visitPreOrder(IVisitor<T> v) {
 		root.visitPreOrder( v );
+	}
+	
+	public void print() {
+		root.print();
 	}
 }

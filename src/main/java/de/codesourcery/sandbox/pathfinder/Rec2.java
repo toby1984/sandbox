@@ -7,6 +7,14 @@ public class Rec2
     public final int x2;
     public final int y2;
 
+    protected Rec2(Vec2 p1,Vec2 p2)
+    {
+    	x1 = p1.x < p2.x ? p1.x : p2.x;
+    	x2 = p1.x > p2.x ? p1.x : p2.x;
+    	y1 = p1.y < p2.y ? p1.y : p2.y;
+    	y2 = p1.y > p2.y ? p1.y : p2.y;
+    }
+    
     protected Rec2(int x1, int y1, int x2, int y2)
     {
         this.x1 = x1;
@@ -150,7 +158,11 @@ public class Rec2
             return false;
         }
         return true;
-    }    
-    
-    
+    }
+
+	@Override
+	public String toString() {
+		return "Rec2 [x1=" + x1 + ", y1=" + y1 + ", x2=" + x2 + ", y2=" + y2
+				+ "]";
+	}    
 }
