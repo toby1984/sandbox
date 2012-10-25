@@ -24,55 +24,6 @@ public class Edge
         return y1 == y2;
     }   
     
-    public boolean overlaps(Edge other) {
-        if ( isHorizontal() != other.isHorizontal() ) {
-            throw new IllegalArgumentException();
-        }
-        
-        if ( isHorizontal() ) {
-            
-            
-            /*     +-------+
-             *     |   t   |
-             * +-----------+----+
-             * |                |
-             * +----------------+
-             */
-            if ( this.x1 <= other.x1 && this.x2 >= other.x2 ||
-                 other.x1 <= this.x1 && other.x2 >= this.x2 ) 
-            {
-                return true;
-            }
-            
-            /*     +-------+
-             *     |   t   |
-             * +------+----+
-             * |      |
-             * +------+
-             */            
-            if ( other.x1 >= this.x1 ||  this.x1 >= other.x1 ) 
-            {
-                final int len = other.x2 - this.x2;
-                Edge remainder = len <= 0 ? null : new Edge( this.x2 , other.y1 , other.x2 , other.y2 );
-                // shorten this edge
-                this.x2 = other.x1;
-                return remainder;
-            } else {
-
-            /* +-------+
-             * |   t   |
-             * +--+----+---+
-             *    |        |
-             *    +--------+
-             */ 
-            }
-            
-            
-        } else {
-            
-        }
-    }
-
     public Edge intersect(Edge other) 
     {
         if ( isHorizontal() != other.isHorizontal() ) {

@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.commons.lang.ObjectUtils;
+
 public class Rec2
 {
-    public final int x1;
-    public final int y1;
-    public final int x2;
-    public final int y2;
+    public int x1;
+    public int y1;
+    public int x2;
+    public int y2;
 
     protected Rec2(Vec2 p1,Vec2 p2)
     {
@@ -27,30 +29,7 @@ public class Rec2
         this.y2 = y2;
     }
     
-    public boolean isAdjactant(Rec2 other) 
-    {
-        if (other.y2 + 1 == y1) { // 1
-            
-            return this.x1 >= other.x1 && this.x1 < other.x2 ||
-                    this.x2 >= other.x1 && this.x2 < other.x2 ||
-                    other.x1 >= this.x1 && other.x1 < this.x2 ||
-                    other.x2 >= this.x1 && other.x2 < this.x2 ||
-        }        
-        
-        if (other.x1 -1 == x2) { // 2
-            
-        }
-
-        if (other.y1 - 1 == y2) { // 3
-            
-        }   
-        if (other.x2 +1 == x1) { // 4
-            
-        }        
-        return  false;
-    }
-    
-    public Rec2 plus(Rec2 other) 
+    public Rec2 union(Rec2 other) 
     {
         final int minX = x1 < other.x1 ? x1 : other.x1;
         final int minY = y1 < other.y1 ? y1 : other.y1;
@@ -58,6 +37,121 @@ public class Rec2
         final int maxX = x2 > other.x2 ? x2 : other.x2;
         final int maxY = y2 > other.y2 ? y2 : other.y2;            
         return new Rec2(minX,minY,maxX,maxY);
+    }
+    
+    public static final class Interval 
+    { 
+        private final int start;
+        private final int end;
+        
+        protected Interval(int start, int end)
+        {
+            this.start = start <= end ? start : end;
+            this.end =  end >= start ? end : start;
+        }
+        
+        public Interval intersection(Interval other) {
+            
+            // sort ascending by start
+            final Interval i1 = this.start <= other.start ? this : other;
+            final Interval i2 = i1 == this ? other : this;
+            
+            if ( i2.start >= i1.end ) { 
+                return null;
+            }
+            if ( i2.end <= i1.end ) {
+                return new Interval( i2.start , i2.end );
+            }
+            return new Interval( i2.start , i1.end );
+        }
+        
+        public boolean isAdjacent(Interval other) {
+            return this.end == other.start || other.start==this.end;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return 31 * (31  + end) + start;
+        }
+        
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (!(obj instanceof Interval) ) {
+                return false;
+            }
+            Interval other = (Interval) obj;
+            return end == other.end && start == other.start;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Interval ( " + start + ", " + end +"]";
+        }
+    }
+    
+    /*
+     *     |-----| case a
+     * |------|
+     * 
+     * |-----|
+     *    |------| case b
+     *
+     *    |-----|
+     * |----------| case c
+     * 
+     * |----------| case d
+     *    |-----|     
+     */
+    public List<Rec2> isAdjacent(Rec2 other) {
+        
+        /* +------+
+         * |   1  |
+         * +--+---+---+  case 1
+         *    |   2   |
+         *    +-------+
+         * 
+         *      +------+
+         *      |   2  |
+         * +----+--+---+ case 2
+         * |   1   |
+         * +-------+
+         */        
+        
+        Edge edge;
+        if ( this.y2 == other.y1 ) { // case #1
+            
+        } else if ( this.y1 == other.y2 ) { // case #2
+            
+        }
+        
+        /* +--+
+         * |  |
+         * | 1+--+
+         * |  |  | case 3
+         * +--+ 2|
+         *    |  |
+         *    +--+
+         *
+         *    +--+
+         *    |  |
+         *    | 2| case 4
+         * +--+  |
+         * |  |  |
+         * | 1+--+
+         * |  |    
+         * +--+ 
+         */         
+        
+        if ( this.x2 == other.x1 ) { // case #3
+            
+        } else if ( other.x1 == this.x2 ) { // case #4
+            
+        }
+        
+        return false;
     }
     
     public List<Rec2> minus(Rec2 other) 

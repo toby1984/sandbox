@@ -53,7 +53,7 @@ public class QuadTreeTest {
 			public void mouseClicked(java.awt.event.MouseEvent e) 
 			{
 				final Point p = panel.viewToModel( e.getX() , e.getY() );
-				regularTree.store( p.x,p.y, 20,20,(byte) 1 );
+				regularTree.store( p.x,p.y, 1,1,(byte) 1 );
 				panel.repaint();
 			};
 		} );  
