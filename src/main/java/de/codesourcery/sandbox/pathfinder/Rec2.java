@@ -1,12 +1,13 @@
 package de.codesourcery.sandbox.pathfinder;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.lang.ObjectUtils;
+import de.codesourcery.sandbox.pathfinder.Edge.OverlapType;
 
-public class Rec2
+public class Rec2 implements IPolygon
 {
     public int x1;
     public int y1;
@@ -39,10 +40,10 @@ public class Rec2
         return new Rec2(minX,minY,maxX,maxY);
     }
     
-    public static final class Interval 
+    public static class Interval 
     { 
-        private final int start;
-        private final int end;
+        public final int start;
+        public final int end;
         
         protected Interval(int start, int end)
         {
@@ -63,6 +64,133 @@ public class Rec2
                 return new Interval( i2.start , i2.end );
             }
             return new Interval( i2.start , i1.end );
+        }
+        
+        public Interval intersectionEndInclusive(Interval other) {
+            
+            // sort ascending by start
+            final Interval i1 = this.start <= other.start ? this : other;
+            final Interval i2 = i1 == this ? other : this;
+            
+            if ( i2.start > i1.end ) { 
+                return null;
+            }
+            if ( i2.end < i1.end ) {
+                return new Interval( i2.start , i2.end );
+            }
+            return new Interval( i2.start , i1.end );
+        }      
+        
+        public static final class IntervalWithType extends Interval {
+
+            private final OverlapType type;
+            
+            protected IntervalWithType(int start, int end,OverlapType type)
+            {
+                super(start, end);
+                this.type = type;
+            }
+            
+            public OverlapType getOverlapType()
+            {
+                return type;
+            }
+            
+            public boolean hasType(OverlapType type) {
+                return type.equals(this.type);
+            }
+        }
+        
+        /**
+         * 
+         * The returned <code>OverlapType</code> indicates which part of interval2 (min2,max2)
+         * overlapped with interval1 (min1,max1).
+         * 
+         * @param min1
+         * @param max1
+         * @param min2
+         * @param max2
+         * @return
+         */
+        public static IntervalWithType intersectionEndInclusive(int min1,int max1, int min2,int max2) {
+            
+            // sort ascending by start
+            if ( min1 <= min2 ) {
+                
+                /*
+                 * i1.start = min1
+                 * i1.end = max1
+                 * 
+                 * i2.start = min2
+                 * i2.end = max2;
+                 * 
+                 * final Interval i1 = this.start <= other.start ? this : other;
+                 * final Interval i2 = i1 == this ? other : this;
+                 * 
+                 * if ( i2.start > i1.end ) { 
+                 *     return null;
+                 * }
+                 * if ( i2.end < i1.end ) {
+                 *     return new Interval( i2.start , i2.end );
+                 * }
+                 * return new Interval( i2.start , i1.end );                 
+                 */
+                
+                if ( min2 > max1 ) { 
+                    return null;
+                }
+                
+                /*      min1 max1
+                 *      |-----|
+                 *       |---|
+                 *      min2 max2     
+                 */
+                if ( max2 < max1 ) {
+                    return new IntervalWithType( min2 , max2,OverlapType.FULLY_CONTAINED);
+                }
+                /*  max2 >= max1
+                 * 
+                 *      min1 max1
+                 *      |-----|
+                 *          |---|  
+                 *        min2  max2   
+                 */
+                
+                return new IntervalWithType( min2 , max1 , OverlapType.START );                
+            } 
+            
+            /*
+             * i1.start = min2
+             * i1.end = max2
+             * 
+             * i2.start = min1
+             * i2.end = max1;
+             */
+            
+            if ( min1 > max2 ) { 
+                return null;
+            }
+            
+            /*  min1 > min2
+             * 
+             *     min1 max1
+             *      |---|
+             *  |-------|
+             *  min2 max2
+             */            
+            if ( max1 < max2 ) {
+                return new IntervalWithType( min1 , max1 , OverlapType.MIDDLE);
+            }
+            
+            /*  max1 >= max2
+             * 
+             *     min1 max1
+             *      |------|
+             *  |-------|
+             *  min2 max2
+             */              
+            return new IntervalWithType( min1 , max2 , OverlapType.END ); 
+            
         }
         
         public boolean isAdjacent(Interval other) {
@@ -151,7 +279,7 @@ public class Rec2
             
         }
         
-        return false;
+        return null;
     }
     
     public List<Rec2> minus(Rec2 other) 
@@ -344,5 +472,36 @@ public class Rec2
 	public String toString() {
 		return "Rec2 [x1=" + x1 + ", y1=" + y1 + ", x2=" + x2 + ", y2=" + y2
 				+ "]";
-	}    
+	}
+
+    @Override
+    public boolean containsPoint(int x, int y)
+    {
+        return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+    }
+
+    @Override
+    public List<Edge> getEdges()
+    {
+        return Arrays.asList( new Edge(x1,y1,x2,y1), // top
+                               new Edge(x2,y1,x2,y2), // right
+                               new Edge(x1,y2,x2,y2), // bottom 
+                               new Edge(x1,y1,x1,y2) ); // left
+    }
+
+    @Override
+    public Rec2 getBoundingBox()
+    {
+        return new Rec2(this.x1 , this.y1 , x2+1,y2+1 );
+    }
+
+    public IPolygon toPolygon() {
+        return new Polygon( getEdges() );
+    }
+    
+    @Override
+    public boolean containsLine(int x1, int y1, int x2, int y2)
+    {
+        return contains( x1 , y1 ) && contains( x2, y2 );
+    }    
 }
