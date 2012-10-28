@@ -22,7 +22,7 @@ public class Rec2 implements IPolygon
     	y2 = p1.y > p2.y ? p1.y : p2.y;
     }
     
-    protected Rec2(int x1, int y1, int x2, int y2)
+    public Rec2(int x1, int y1, int x2, int y2)
     {
         this.x1 = x1;
         this.y1 = y1;
