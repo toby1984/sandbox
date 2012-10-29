@@ -9,6 +9,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.swing.JFrame;
@@ -37,30 +38,26 @@ public class MergeTest
             x = ( x / 10 ) * 10;
             y = ( y / 10 ) * 10;
             
-            if ( polygons.size() >= 2 ) 
-            {
-                polygons.clear();
-            }
-            
             final Rec2 r = new Rec2(x,y,x+40,y+30);
             polygons.add( r.toPolygon() );            
 
             repaint();
         }        
+        
+        public void clear() {
+            polygons.clear();
+            mergeResult=null;
+            repaint();
+        }
 
         @Override
         public void paint(Graphics g)
         {
             super.paint(g);
-            
-            if ( polygons.size() >= 1 ) {
-                g.setColor(Color.BLUE);
-                drawPolygon(polygons.get(0),g);
-            }
-            
-            if ( polygons.size() >= 2 ) {
-                g.setColor(Color.RED);
-                drawPolygon(polygons.get(1),g);
+
+            g.setColor(Color.BLUE);
+            for ( IPolygon poly : polygons ) {
+                drawPolygon( poly ,g);
             }            
             
             if ( mergeResult != null )
@@ -72,17 +69,26 @@ public class MergeTest
         
         public void merge()
         {
-            if ( polygons.size() == 2 ) 
+            if ( polygons.size() >= 2 ) 
             {
-                Polygon newPoly = new Polygon( polygons.get(0).getEdges() );
+                Polygon mergeTarget = null;
                 
-                try {
-                newPoly.merge( polygons.get(1) );
-                mergeResult = newPoly;
-                System.out.println( polygons.get(0)+" <-> "+polygons.get(1)+" => "+mergeResult);
-                } catch(IllegalArgumentException e) {
-                    System.out.println("Polygons do not overlap.");
+                Iterator<IPolygon> it = polygons.iterator();
+                while ( it.hasNext() ) 
+                {
+                    IPolygon p = it.next();
+                    if ( mergeTarget == null ) {
+                        mergeTarget = new Polygon( p.getEdges() );
+                    } else {
+                        try {
+                            mergeTarget.merge( p );
+                        } 
+                        catch(IllegalArgumentException e) {
+                            // ok
+                        }
+                    }
                 }
+                mergeResult = mergeTarget;
             } else {
                 System.out.println("Not enough polygons selected.");
                 this.mergeResult = null;
@@ -100,17 +106,7 @@ public class MergeTest
         private void drawLine(Vec2 p1,Vec2 p2,Graphics g) 
         {
             g.drawLine( p1.x,p1.y,p2.x,p2.y );
-            
-//            g.drawString( "( "+p1.x+" , "+p1.y+" ) -> ( "+p2.x+" , "+p2.y+" )" , p1.x, p1.y );            
         }
-        
-        private void drawPoint(Vec2 p1,Graphics g) {
-            final int x = p1.x;
-            final int y = p1.y;
-            g.drawLine( x-5,y,x+5,y);
-            g.drawLine( x,y-5,x,y+5);
-//            g.drawString( "( "+x+" , "+y+" )" , x, y );
-        }        
         
     }
     
@@ -118,14 +114,6 @@ public class MergeTest
 
         final MyPanel panel = new MyPanel();
         
-//      Random rnd = new Random(System.currentTimeMillis());
-//      for ( int i = 0 ; i < 1000 ; i++ ) 
-//      {
-//          int x = rnd.nextInt(MODEL_WIDTH);
-//          int y = rnd.nextInt(MODEL_HEIGHT);
-//          regularTree.store( x,y,(byte)1);
-//      }
-
         panel.setPreferredSize(new Dimension(MODEL_WIDTH,MODEL_HEIGHT));
 
         final MouseAdapter mouseListener = new MouseAdapter() 
@@ -179,6 +167,8 @@ public class MergeTest
                 if ( e.getKeyChar() == ' ' ) 
                 {
                     panel.merge();
+                } else if ( e.getKeyChar() == 'x' ) {
+                    panel.clear();
                 }
             };
         } );

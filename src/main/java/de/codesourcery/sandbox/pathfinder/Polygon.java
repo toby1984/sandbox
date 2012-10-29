@@ -1,8 +1,10 @@
 package de.codesourcery.sandbox.pathfinder;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -148,9 +150,9 @@ outer:
             throw new IllegalArgumentException( this+" does not overlap "+polygon);
         }
         
-        final List<Edge> toAdd = new ArrayList<Edge>();
+        final Set<Edge> toRemove = new HashSet<>();
+        final List<Edge> toAdd = new ArrayList<>();
         
-outer:        
         for ( Edge otherEdge : polygon.getEdges() ) 
         {
             int intersectCount = 0;
@@ -165,10 +167,17 @@ outer:
                 else if ( result.isPoint() ) 
                 {
                     final PointOption point = result.asPointOption();
-                    if ( ! containsLine( otherEdge.x1 , otherEdge.y1 , point.x ,point.y ) ) {
+                    if ( ! containsPoint( otherEdge.x1 , otherEdge.y1 ) ) {
                         toAdd.add( new Edge( otherEdge.x1 , otherEdge.y1 , point.x ,point.y ) );
-                    } else if ( ! containsLine( otherEdge.x2 , otherEdge.y2 , point.x ,point.y ) ) {
+                    } else {
                         toAdd.add( new Edge( otherEdge.x2 , otherEdge.y2 , point.x ,point.y ) );
+                    }
+                    if ( ! polygon.containsPoint( thisEdge.x2 , thisEdge.y2 ) ) {
+                        toRemove.add( thisEdge );
+                        toAdd.add( new Edge( point.x , point.y , thisEdge.x2 , thisEdge.y2 ) );
+                    } else  if ( ! polygon.containsPoint( thisEdge.x1 , thisEdge.y1 ) ) {
+                        toRemove.add( thisEdge );
+                        toAdd.add( new Edge( point.x , point.y , thisEdge.x1 , thisEdge.y1 ) );
                     }
                     intersectCount++;
                 } 
@@ -206,6 +215,7 @@ outer:
             }
         }
         
+        this.edges.removeAll( toRemove );
         this.edges.addAll( toAdd );
         recalcBoundingBox();
     }

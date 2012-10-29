@@ -228,8 +228,8 @@ public class Edge
      * @param other
      * @return
      */
-    public IntersectionResult calcIntersection(Edge other) {
-        
+    public IntersectionResult calcIntersection(Edge other) 
+    {
         if ( this == other || this.equals( other ) )
         {
             // trivial case: lines are identical
