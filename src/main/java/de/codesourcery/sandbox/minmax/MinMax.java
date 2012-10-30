@@ -14,7 +14,7 @@ public class MinMax
     
     private static final int PLAYER_WON = 0xdeadbeef;
     
-    private static final int MAX_DEPTH = 5;
+    private static final int MAX_DEPTH = 10;
     
     public static final class Move 
     {
@@ -38,7 +38,7 @@ public class MinMax
         @Override
         public String toString()
         {
-            return "Move[ "+x+" , y "+"]";
+            return "Move[ "+x+" , "+y+"]";
         }
     }
     
@@ -65,7 +65,7 @@ public class MinMax
         public Move findMove(Player currentPlayer) 
         {
             bestMove = null;
-            miniMax( currentPlayer , 0 , NEG_INFINITY-1 , POS_INFINITY );
+            miniMax( currentPlayer , 0 , NEG_INFINITY , POS_INFINITY );
             return bestMove;
         }
 
@@ -100,6 +100,12 @@ public class MinMax
             {
                 next.apply(board,currentPlayer);
                 int rating = -miniMax( otherPlayer( currentPlayer ), depth+1 , -beta, -alpha );
+                
+                if ( depth == 0 ) {
+                    System.out.println("Score: "+rating);
+                    System.out.println( board.toString(next.x,next.y,"C" ) );
+                }
+                
                 next.undo( board );
                 
                if (rating > localAlpha) 
@@ -118,7 +124,7 @@ public class MinMax
                    if (alpha >= beta) {
 //                     System.out.println( "Pruning for "+currentPlayer+" , score: "+wert+" , alpha = "+alpha+" , beta = "+beta);
 //                     System.out.println( board );                       
-                     return rating;
+                     break;
                    }
                } 
             }
@@ -214,18 +220,23 @@ public class MinMax
 
     public int evaluate(Board board, Player currentPlayer,Player player1,Player player2) 
     {
-        if ( hasWon( board , currentPlayer.equals(player1) ? player2: player1) ) {
-            return NEG_INFINITY;
+        if ( hasWon( board , 
+                currentPlayer.equals(player1) ? player2: player1) ) {
+            return -1;
         }
         
-        int sum = sumMaxSuccessiveTilesInARow(board, currentPlayer);
         
-        if ( sum == PLAYER_WON ) 
-        {
-            return POS_INFINITY;
+        if ( hasWon(board,currentPlayer) ) {
+            return 1;
         }
+//        int sum = sumMaxSuccessiveTilesInARow(board, currentPlayer);
+//        
+//        if ( sum == PLAYER_WON ) 
+//        {
+//            return 1;
+//        }
 
-        return sum;
+        return 0;
     }        
     
     private int sumMaxSuccessiveTilesInARow(Board board,Player currentPlayer) 
