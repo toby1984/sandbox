@@ -2,23 +2,28 @@ package de.codesourcery.sandbox.minmax;
 
 import java.awt.Color;
 
-import org.apache.commons.lang.ObjectUtils;
-
 public class Player 
 {
+    private final byte id;
     private final String name;
     private final Color color;
 
-    protected Player(String name,Color color)
+    protected Player(int id,String name,Color color)
     {
-        this.name = name;
+        this.id = (byte) id;
+        this.name = name.toUpperCase();
         this.color = color;
+    }
+    
+    public byte getId()
+    {
+        return id;
     }
     
     @Override
     public String toString()
     {
-        return "Player[ "+name+" ]";
+        return name;
     }
     
     public Color getColor()
@@ -29,7 +34,7 @@ public class Player
     @Override
     public int hashCode()
     {
-        return name.hashCode();
+        return id;
     }
 
     @Override
@@ -37,7 +42,7 @@ public class Player
     {
         if (obj instanceof Player) {
             final Player other = (Player) obj;
-            return ObjectUtils.equals( name , other.name);
+            return this.id == other.id;
         }
         return false;
     }

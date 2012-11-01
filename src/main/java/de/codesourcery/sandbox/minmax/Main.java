@@ -7,6 +7,9 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -18,18 +21,32 @@ import de.codesourcery.sandbox.pathfinder.Vec2d;
 
 public class Main
 {
-    public static void main(String[] args)
+    private static final boolean DEBUG_BOARD = false;
+    
+    public static void main(String[] args) throws InterruptedException
     {
         new Main().run();
     }
 
-    private final Board board = new Board(4,4);
-    private final Player human = new Player("Human",Color.GREEN);
-    private final Player computer = new Player("Computer",Color.BLACK);
+    private final Random rnd = new Random(System.currentTimeMillis());
+    
+    private final MyPanel panel = new MyPanel();
+
+    private final Player HUMAN = new Player(1,"Human",Color.GREEN);
+    
+    private final Player COMPUTER1 = new Player(2,"Computer 1",Color.BLACK);
+    private final Player COMPUTER2 = new Player(3,"Computer 2",Color.RED);
+    
+    private final Player player1 = COMPUTER1;
+    private final Player player2 = COMPUTER2;
+    
+    // game state
+    private final Object BOARD_LOCK = new Object();
+    private final Board board = new Board(7,6);    
     
     private boolean gameOver;
     private Player winner = null;
-
+    
     protected final class MyPanel extends JPanel {
 
         private int xOffset;
@@ -43,7 +60,9 @@ public class Main
         public void paint(Graphics g)
         {
             super.paint(g);
-            renderBoard(g);
+            synchronized(BOARD_LOCK) {
+                renderBoard(g);
+            }
         }
 
         private void renderBoard(final Graphics g) {
@@ -78,10 +97,12 @@ public class Main
 
             if ( gameOver ) 
             {
-                g.setColor(Color.RED);                
+                                
                 if ( winner != null ) {
+                    g.setColor(winner.getColor());
                     g.drawString( "Winner: "+winner.name() , 15,15 );
                 } else {
+                    g.setColor(Color.RED);
                     g.drawString( "Draw !!!!" , 15 , 15 );
                 }
             }
@@ -102,7 +123,6 @@ public class Main
             int i = (int) ( (x1-xOffset) / xInc);
             int j = (int) ( (y1-yOffset) / yInc);
 
-            System.out.println("Clicked: "+i+","+j);  
             if ( i < 0 || i >= board.width() || j < 0 || j >= board.height() ) {
                 return null;
             }
@@ -111,7 +131,6 @@ public class Main
             double dx = x1 - center.x;
             double dy = y1 - center.y;
             double distance = Math.sqrt(dx*dx+dy*dy);
-            System.out.println("Distance: "+distance+" , radius="+radius);
             if ( distance <= radius ) {
                 return new Vec2(i,j);
             }
@@ -119,9 +138,60 @@ public class Main
         }
     }
 
-    public void run() {
-
-        final MyPanel panel = new MyPanel();
+    
+    public void autoPlay(Player currentPlayer) {
+        
+        if ( gameOver ) {
+            return;
+        }
+        
+        System.out.println("Thinking: "+currentPlayer);        
+        
+        synchronized( BOARD_LOCK ) 
+        {
+            final Move move;
+            if ( board.isEmpty() ) {
+                final List<Move> possible = board.getPossibleMoves( currentPlayer );
+                move = possible.get( rnd.nextInt(possible.size()) );
+            } else {
+                move = new MinMax().calcNextMove( board , currentPlayer , player1, player2 );
+            }
+            move.apply( board , currentPlayer );
+    
+            checkGameOver();
+        }
+        panel.repaint();        
+    }
+    
+    private void checkGameOver() 
+    {
+        if ( ! gameOver )
+        {
+            if ( new MinMax().hasWon( board , player1 ) ) 
+            {
+                gameOver = true;
+                winner = player1;
+                return;
+            } 
+            
+            if ( new MinMax().hasWon( board , player2 ) ) 
+            {
+                gameOver = true;
+                winner = player2;
+                return;
+            }                
+            
+            if ( board.isFull() ) {
+                gameOver = true;
+            }
+            
+            if ( gameOver ) {
+                System.out.println("*** Game over. ***");
+            }
+        }
+    }
+    
+    public void run() throws InterruptedException {
 
         panel.setPreferredSize(new Dimension(600,400));
 
@@ -130,58 +200,41 @@ public class Main
             public void mouseClicked(java.awt.event.MouseEvent e) 
             {
                 Vec2 clicked = panel.viewToModel( e.getX(), e.getY() );
-                if ( clicked != null && ! gameOver ) {
-                    Player existing = board.read(clicked.x,clicked.y);
-                    if ( existing == null ) 
+                if ( clicked != null && ! gameOver ) 
+                {
+                    if ( board.isValidMove( clicked.x , clicked.y ) )
                     {
-                        board.set( clicked.x , clicked.y , human );
+                        board.set( clicked.x , clicked.y , player1 );
 
-                        MinMax minMax = new MinMax();
-
-                        int score = minMax.evaluate( board , human , human,computer );
-                        System.out.println("Score = "+score);
+                        checkGameOver();
                         
-                        if ( minMax.hasWon(board , human ) ) {
-                            gameOver = true;
-                            winner = human;
-                        } 
-                        
-                        if ( board.isFull() ) {
-                            gameOver = true;
-                        }
-                        
-                        if ( ! gameOver ) 
+                        if ( ! gameOver && ! DEBUG_BOARD ) 
                         {
                             System.out.println("Calculating...");
-                            Move move = minMax.calcNextMove( board , computer , human, computer );
-                            System.out.println("Finished , best move: "+move);
-                            move.apply( board , computer );
                             
-                            score = minMax.evaluate( board , computer , human,computer );
-                            System.out.println("Score = "+score);
-                            
-                            if ( minMax.hasWon(board , computer ) ) {
-                                winner = computer;
-                                gameOver = true;
-                            }
-                            if ( board.isFull() ) {
-                                gameOver = true;
-                            }
+                            Move move = new MinMax().calcNextMove( board , player2 , player1, player2 );
+                            move.apply( board , player2 );
+
+                            checkGameOver();
                         }
+                        
                         panel.repaint();
                     }
                 }
             }
         };
 
-        panel.addMouseListener( mouseListener );  
+        if ( player1.equals( HUMAN ) || player2.equals( HUMAN ) ) {
+            panel.addMouseListener( mouseListener );
+        } 
 
         final JFrame frame = new JFrame("Tic-Tac-Tock");
 
         frame.addKeyListener( new KeyAdapter() {
 
-            public void keyTyped(java.awt.event.KeyEvent e) {
-                if ( e.getKeyChar() == ' ' ) {
+            public void keyTyped(java.awt.event.KeyEvent e) 
+            {
+                if ( gameOver && e.getKeyChar() == ' ' ) {
                     board.clear();
                     winner=null;
                     gameOver = false;
@@ -200,6 +253,19 @@ public class Main
         frame.getContentPane().add( panel , cnstrs );
         frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
         frame.pack();
-        frame.setVisible( true );        
+        frame.setVisible( true );   
+        
+        if ( ! player1.equals(HUMAN) && ! player2.equals(HUMAN) ) {
+            while ( true ) 
+            {
+                while ( ! gameOver ) 
+                {
+                    autoPlay( player1 );
+                    autoPlay( player2 );
+                }
+                System.out.println("*** Game over. ***");
+                Thread.sleep(1000);
+            }
+        }
     }
 }
