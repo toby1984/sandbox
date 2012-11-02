@@ -7,9 +7,22 @@ import org.apache.commons.lang.StringUtils;
 
 public class RTree<T>
 {
-    private static final int MAX_FILL_FACTOR = 2;
+    private final int maxChildNodes; 
     
     private RegularNode<T> root;
+    
+    /**
+     * Create instance.
+     * 
+     * @param maxChildNodes the maximum number of children a node may have before being split in two.
+     */
+    public RTree(int maxChildNodes) 
+    {
+    	if ( maxChildNodes < 2 ) {
+    		throw new IllegalArgumentException("maxChildNodes needs to be >= 2");
+    	}
+    	this.maxChildNodes = maxChildNodes;
+    }
     
     /**
      * Regular tree node that either has other regular tree nodes or leaf nodes 
@@ -17,7 +30,7 @@ public class RTree<T>
      * 
      * @author tobias.gierke@voipfuture.com
      */
-    protected static class RegularNode<T> extends Rec2 {
+    public static class RegularNode<T> extends Rec2 {
 
         private RegularNode<T> parent;
         
@@ -51,6 +64,16 @@ public class RTree<T>
                 }
             }
             return true;
+        }
+        
+        public void getValues(Rec2 rect,List<ValueNode<T>> result) 
+        {
+        	if ( ! overlap( rect ) ) {
+        		return;
+        	}
+        	for ( RegularNode<T> child : children ) {
+        		child.getValues( rect , result );
+        	}
         }
         
         protected void addChild(RegularNode<T> child,boolean updateBB) 
@@ -111,7 +134,7 @@ public class RTree<T>
                 return;
             }
             
-            if ( children.size() < MAX_FILL_FACTOR ) {
+            if ( children.size() <= tree.maxChildNodes ) {
                 final Leaf<T> l = new Leaf<T>(bb);
                 addChild( l , true );
                 l.add( tree , bb , value );
@@ -140,7 +163,7 @@ public class RTree<T>
                 return;
             }
             
-            if ( children.size() < MAX_FILL_FACTOR ) 
+            if ( children.size() <= tree.maxChildNodes ) 
             {
                 addChild( node , true );
                 return;
@@ -238,7 +261,7 @@ public class RTree<T>
         }         
     }
     
-    protected static final class Leaf<T> extends RegularNode<T>
+    public static final class Leaf<T> extends RegularNode<T>
     {
         private final List<ValueNode<T>> values = new ArrayList<>();
         
@@ -246,6 +269,21 @@ public class RTree<T>
         {
             super(bb);
         }
+        
+        @Override
+        public void getValues(Rec2 rect,List<ValueNode<T>> result) 
+        {
+        	if ( ! overlap( rect ) ) {
+        		return;
+        	}
+        	
+        	for ( ValueNode<T> child : values ) 
+        	{
+        		if ( child.overlap( rect ) ) {
+        			result.add( child );
+        		}
+        	}
+        }        
         
         public boolean visitPreOrder(RTreeVisitor<T> visitor,int depth ) 
         {
@@ -288,7 +326,7 @@ public class RTree<T>
         
         public void add(RTree<T> tree,Rec2 bb,T value) 
         {
-            if ( values.size() < MAX_FILL_FACTOR ) 
+            if ( values.size() < tree.maxChildNodes ) 
             {
                     final ValueNode<T> l = new ValueNode<T>( bb , value );
                     values.add( l );
@@ -302,7 +340,6 @@ public class RTree<T>
         
         private RegularNode<T> splitNode(RTree<T> tree) 
         {
-            // find node's with the worst fit
             ValueNode<T> node1 = null;
             ValueNode<T> node2 = null;
             Rec2 largestBB = null;
@@ -394,7 +431,7 @@ public class RTree<T>
         }        
     }
     
-    protected static final class ValueNode<T> extends Rec2 
+    public static final class ValueNode<T> extends Rec2 
     {
         private final T value;
         
@@ -463,12 +500,25 @@ public class RTree<T>
         root.add( this , bb , object );
     }
     
+    public List<ValueNode<T>> getValues(Rec2 rect) {
+    	
+    	final List<ValueNode<T>> result=new ArrayList<>();
+    	if ( root == null ) {
+			return result;
+    	}
+    	root.getValues(rect,result);
+    	return result;
+    }
+    
     public static void main(String[] args)
     {
-        final RTree<Integer> rtree = new RTree<Integer>();
+        final RTree<Integer> rtree = new RTree<Integer>(3);
         rtree.add( new Rec2( 0 , 0 , 100 ,100 ) , new Integer(1) );
         rtree.add( new Rec2( 10 , 10 , 20 ,20 ) , new Integer(2) );     
-        rtree.add( new Rec2( 110 , 110 , 150 ,150 ) , new Integer(3) );         
+        rtree.add( new Rec2( 110 , 110 , 150 ,150 ) , new Integer(3) );
+        
+        rtree.add( new Rec2( 5 , 5 , 10 ,10 ) , new Integer(4) );
+        rtree.add( new Rec2( 5 , 5 , 10 ,10 ) , new Integer(5) );
         System.out.println( rtree );
     }
 }
