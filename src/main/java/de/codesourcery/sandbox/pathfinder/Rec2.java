@@ -22,6 +22,13 @@ public class Rec2 implements IPolygon
     	y2 = p1.y > p2.y ? p1.y : p2.y;
     }
     
+    public Rec2(Rec2 r) {
+        this.x1 = r.x1;
+        this.x2 = r.x2;
+        this.y1 = r.y1;
+        this.y2 = r.y2;
+    }
+    
     public Rec2(int x1, int y1, int x2, int y2)
     {
         this.x1 = x1;
@@ -38,6 +45,13 @@ public class Rec2 implements IPolygon
         final int maxX = x2 > other.x2 ? x2 : other.x2;
         final int maxY = y2 > other.y2 ? y2 : other.y2;            
         return new Rec2(minX,minY,maxX,maxY);
+    }
+    
+    public void set(Rec2 r) {
+        this.x1 = r.x1;
+        this.y1 = r.y1;
+        this.x2 = r.x2;
+        this.y2 = r.y2;
     }
     
     public static class Interval 
@@ -447,12 +461,15 @@ public class Rec2 implements IPolygon
     @Override
     public final boolean equals(Object obj)
     {
-        if (!(obj instanceof Rec2) ) 
+        if ( obj != null && obj.getClass() == Rec2.class )
         {
-            return false;
+            return hasSameCoordinates((Rec2) obj);
         }
-        
-        final Rec2 other = (Rec2) obj;
+        return false;
+    }
+    
+    public final boolean hasSameCoordinates(Rec2 other) 
+    {
         if (x1 != other.x1) {
             return false;
         }
@@ -470,9 +487,12 @@ public class Rec2 implements IPolygon
 
 	@Override
 	public String toString() {
-		return "Rec2 [x1=" + x1 + ", y1=" + y1 + ", x2=" + x2 + ", y2=" + y2
-				+ "]";
+		return "Rec2 ["+getCoordinateString()+"]";
 	}
+	
+    public String getCoordinateString() {
+        return "x1=" + x1 + ", y1=" + y1 + ", x2=" + x2 + ", y2=" + y2;
+    }	
 
     @Override
     public boolean containsPoint(int x, int y)
