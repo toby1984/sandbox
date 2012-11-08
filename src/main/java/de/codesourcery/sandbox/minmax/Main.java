@@ -37,7 +37,7 @@ public class Main
     private final Player COMPUTER1 = new Player(2,"Computer 1",Color.BLACK);
     private final Player COMPUTER2 = new Player(3,"Computer 2",Color.RED);
     
-    private final Player player1 = COMPUTER1;
+    private final Player player1 = HUMAN;
     private final Player player2 = COMPUTER2;
     
     // game state

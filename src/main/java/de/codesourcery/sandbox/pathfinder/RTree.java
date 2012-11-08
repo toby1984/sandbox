@@ -285,6 +285,7 @@ public class RTree<T>
         	}
         }        
         
+        @Override
         public boolean visitPreOrder(RTreeVisitor<T> visitor,int depth ) 
         {
             if ( ! visitor.visitNode( this ,  depth ) ) {
@@ -299,6 +300,7 @@ public class RTree<T>
             return true;
         }        
         
+        @Override
         protected void addChild(RegularNode<T> child,boolean updateBB) {
             throw new UnsupportedOperationException("addChild() not supported on leaf nodes");
         }
@@ -311,6 +313,7 @@ public class RTree<T>
             }
         }        
         
+        @Override
         protected void recalcBoundingBox() 
         {
             Rec2 bb = null;
@@ -324,6 +327,7 @@ public class RTree<T>
             setBoundingBox( bb );
         }        
         
+        @Override
         public void add(RTree<T> tree,Rec2 bb,T value) 
         {
             if ( values.size() < tree.maxChildNodes ) 
@@ -419,10 +423,6 @@ public class RTree<T>
             
             return newNode;
         }        
-        
-        public boolean isLeaf() {
-            return true;
-        }       
         
         @Override
         public String toString()
