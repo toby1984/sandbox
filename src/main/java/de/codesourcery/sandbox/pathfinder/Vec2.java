@@ -14,6 +14,29 @@ public class Vec2
         this.x = x;
         this.y = y;
     }
+    
+    public Vec2 wrapIfNecessary(int max) {
+        
+        int newX = x;
+        int newY = y;
+        
+        if ( newX < 0 ) 
+        {
+            newX = max+x;
+        } else if ( newX >= max ) {
+            newX = newX - max;
+        }
+        if ( newY < 0 ) {
+            newY = max+y;
+        }
+        if ( newY >= max) {
+            newY = newY - max;
+        }        
+        if ( newX != x || newY != y ) {
+            return new Vec2( newX, newY );
+        }
+        return this;
+    }
 
     public Vec2 add(Vec2 o) {
         return new Vec2(this.x+o.x,this.y+o.y);

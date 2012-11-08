@@ -4,7 +4,7 @@ public class Vec2d
 {
     private static final float RAD_TO_DEG = (float) ( 180.0d / Math.PI );
 
-    public static final Vec2 ORIGIN = new Vec2(0,0);
+    public static final Vec2d ORIGIN = new Vec2d(0,0);
 
     public final double x;
     public final double y;
@@ -14,8 +14,30 @@ public class Vec2d
         this.x = x;
         this.y = y;
     }
+    
 
-    public Vec2d add(Vec2 o) {
+    public Vec2d rotate90DegreesCW() {
+        // The right-hand normal of vector (x, y) is (y, -x), and the left-hand normal is (-y, x)
+        return new Vec2d( y , -x );
+    }
+    
+    public Vec2d rotate90DegreesCCW() {
+        // The right-hand normal of vector (x, y) is (y, -x), and the left-hand normal is (-y, x)
+        return new Vec2d( -y , x );
+    }    
+    
+    public Vec2d limit(double maxValue) 
+    {
+        final double speed = length();
+        if ( speed > maxValue ) {
+            
+        } else {
+            return this;
+        }
+        return normalize().multiply( maxValue );
+    }
+    
+    public Vec2d add(Vec2d o) {
         return new Vec2d(this.x+o.x,this.y+o.y);
     }
     
@@ -24,7 +46,33 @@ public class Vec2d
         double l = length();
         return new Vec2d( x/l , y/l );
     }
+    
+    public Vec2d wrapIfNecessary(double maxValue)
+    {
+        double newX = x;
+        double newY = y;
+        
+        if ( newX < 0 ) {
+            newX = maxValue+newX;
+        } else if ( newX >= maxValue ) {
+            newX = newX-maxValue;
+        }
+        if ( newY < 0 ) {
+            newY = maxValue+newY;
+        } else if ( newY >= maxValue ) {
+            newY = newY-maxValue;
+        }       
+        
+        if ( newX != x || newY != y ) {
+            return new Vec2d(newX,newY);
+        }
+        return this; 
+    }
 
+    public Vec2d divide(double factor) {
+        return new Vec2d( x/factor , y/factor );
+    }
+    
     public Vec2d multiply(double factor) {
         return new Vec2d( factor*x , factor*y );
     }
@@ -33,7 +81,7 @@ public class Vec2d
         return new Vec2d(this.x-x1,this.y-y1);
     }      
 
-    public Vec2d minus(Vec2 o) {
+    public Vec2d minus(Vec2d o) {
         return new Vec2d(this.x-o.x,this.y-o.y);
     }    
 
