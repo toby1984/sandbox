@@ -29,7 +29,7 @@ import de.codesourcery.sandbox.pathfinder.Vec2d;
 
 public class Main extends JFrame
 {
-    protected static final boolean DEBUG = true;
+    protected static final boolean DEBUG = false;
 
     protected static final int THREAD_COUNT = Runtime.getRuntime().availableProcessors();
 
@@ -41,15 +41,15 @@ public class Main extends JFrame
     protected static final double SEPARATION_RADIUS = 40;
     protected static final double NEIGHBOUR_RADIUS = 100;
 
-    protected static final double MAX_FORCE = 4;
-    protected static final double MAX_SPEED = 4;     
+    protected static final double MAX_FORCE = 5;
+    protected static final double MAX_SPEED = 10;     
 
     protected static final double COHESION_WEIGHT = 0.33d;
-    protected static final double SEPARATION_WEIGHT = 1d;
+    protected static final double SEPARATION_WEIGHT = 0.33d;
     protected static final double ALIGNMENT_WEIGHT = 0.33d;
 
     protected static final double  MODEL_MAX = 3000;
-    protected static final int POPULATION_SIZE = 4000;
+    protected static final int POPULATION_SIZE = 1000;
     protected static final int  TILE_COUNT = 80;
 
     protected static final Object WORLD_LOCK = new Object();
@@ -82,10 +82,22 @@ public class Main extends JFrame
 
         final Runnable r = new Runnable() 
         {
+        	private int dropCount;
+        	private int frameCount;
+        	private int previouslyDroppedFrame=-1;
             @Override
             public void run()
             {
-                mayRender.set( true );
+            	frameCount++;
+            	if ( ! mayRender.compareAndSet( false , true ) ) 
+            	{
+                	if ( previouslyDroppedFrame != frameCount-1 ) 
+                	{
+                		System.out.println("*** Frames dropped: "+dropCount);            		
+                	}
+            		dropCount++;
+            		previouslyDroppedFrame=frameCount;
+            	}
             }
         };
         
@@ -227,7 +239,7 @@ public class Main extends JFrame
         mean = mean.plus( alignmentVec.normalize().multiply( ALIGNMENT_WEIGHT ) );
 
         // separation
-        Vec2d separationVec = visitor.getAverageSeparationHeading().multiply( SEPARATION_WEIGHT );
+        Vec2d separationVec = visitor.getAverageSeparationHeading();
         mean = mean.plus( separationVec.normalize().multiply( SEPARATION_WEIGHT ) );
 
         return mean;
@@ -368,6 +380,7 @@ public class Main extends JFrame
 
         public MyPanel() 
         {
+        	setBackground(Color.WHITE);
             addMouseMotionListener( new MouseMotionListener() {
 
                 @Override
@@ -427,7 +440,7 @@ public class Main extends JFrame
 
         private void drawBoid(Boid boid, boolean firstBoid , Graphics g)
         {
-            drawBoid(boid,firstBoid,Color.BLACK,true , g);
+            drawBoid(boid,firstBoid,Color.BLUE,true , g);
         }
 
         private void drawBoid(final Boid boid, boolean isDebugBoid , Color color , boolean fill , final Graphics g)
