@@ -25,11 +25,6 @@ public class Boid
         this.velocity = velocity;
     }
 
-    public Vec2d getHeading()
-    {
-        return velocity.normalize();
-    }
-    
     public Vec2d getLocation()
     {
         return location;
@@ -49,5 +44,8 @@ public class Boid
     {
         this.acceleration = acceleration;
     }
-
+    
+    public Vec2d getNeighbourRadiusCenter() {
+        return location;
+    }
 }

@@ -9,7 +9,6 @@ import de.codesourcery.sandbox.pathfinder.Vec2d;
 
 public final class World
 {
-    private final double maxCoordinates;
     private final int tileCount;
     private final double xInc;
     private final double yInc;
@@ -32,7 +31,6 @@ public final class World
     public World(double maxCoordinates, int tileCount) {
         
         this.tileCount = tileCount;
-        this.maxCoordinates = maxCoordinates;
         
         xInc = maxCoordinates / tileCount;
         yInc = maxCoordinates / tileCount;
@@ -52,12 +50,7 @@ public final class World
             }
         }
     } 
-    
-    public boolean isWithinWorld(Vec2d vec) {
-        return vec.x >= 0 && vec.x < maxCoordinates &&
-                vec.y >= 0 && vec.y < maxCoordinates;
-    }
-    
+        
     public void add(Boid boid) {
     
         if (boid == null) {
@@ -67,28 +60,12 @@ public final class World
         allBoids.add( boid );
         tiles[coords.x][coords.y].boids.add( boid );
     }
-    
-    public void positionChanged(Boid boid,Vec2d oldPosition) {
         
-        final Vec2 oldTile = modelToTile( oldPosition );
-        final Vec2 newTile = modelToTile( boid.getLocation() );  
-        
-        if ( ! oldTile.equals( newTile ) ) 
-        {
-            tiles[oldTile.x][oldTile.y].boids.remove( boid );
-            tiles[newTile.x][newTile.y].boids.add( boid );
-        }
-    }
-    
     public interface IBoidVisitor 
     {
         public void visit(Boid boid);
     }
-    
-    public interface ITileVisitor {
-        public boolean visit(Tile tile);
-    }
-    
+        
     public void visitAllBoids(IBoidVisitor visitor) {
         for ( Boid b : allBoids ) {
             visitor.visit( b );

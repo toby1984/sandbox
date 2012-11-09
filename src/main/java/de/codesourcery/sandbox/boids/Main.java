@@ -20,20 +20,20 @@ public class Main extends JFrame
 {
     public static final boolean DEBUG = true;
     
-    public static final double SEPARATION_RADIUS = 10;
-    public static final double NEIGHTBOUR_RADIUS = 40;
+    public static final double SEPARATION_RADIUS = 40;
+    public static final double NEIGHTBOUR_RADIUS = 60;
     
-    public static final double MAX_FORCE = 0.05;
+    public static final double MAX_FORCE = 2;
     
-    public static final double COHESION_WEIGHT = 0.2d;
-    public static final double SEPARATION_WEIGHT = 1d;
-    public static final double ALIGNMENT_WEIGHT = 0.05d;
+    public static final double COHESION_WEIGHT = 0.05d;
+    public static final double SEPARATION_WEIGHT = 2d;
+    public static final double ALIGNMENT_WEIGHT = 0.08d;
     
     public static final double  MODEL_MAX = 1000;
-    public static final int  TILE_COUNT = 20;
-    public static final int POPULATION_SIZE = 50;
+    public static final int  TILE_COUNT = 50;
+    public static final int POPULATION_SIZE = 150;
     
-    public static final double MAX_SPEED = 2;    
+    public static final double MAX_SPEED = 3;    
     
     public static final int TICK_DELAY = 10;
     
@@ -118,10 +118,6 @@ public class Main extends JFrame
                 Vec2d newVelocity = v0.add( newAcceleration ).limit( MAX_SPEED );
                 Vec2d newLocation = pos0.add( newVelocity ).wrapIfNecessary( MODEL_MAX );
 
-                boid.setAcceleration( newAcceleration ); 
-                boid.setVelocity( newVelocity );
-                boid.setLocation( newLocation );
-                
                 newWorld.add( new Boid( newLocation , newAcceleration , newVelocity ) );
             }
         };
@@ -132,8 +128,11 @@ public class Main extends JFrame
     
     protected Vec2d flock(Boid boid)
     {
-        final Vec2d pos = boid.getLocation();
-        final Rec2D rect = new Rec2D( pos.x - NEIGHTBOUR_RADIUS , pos.y - NEIGHTBOUR_RADIUS , pos.x + NEIGHTBOUR_RADIUS , pos.y + NEIGHTBOUR_RADIUS);
+        final Vec2d pos = boid.getNeighbourRadiusCenter();
+        final Rec2D rect = new Rec2D( pos.x - NEIGHTBOUR_RADIUS , 
+                pos.y - NEIGHTBOUR_RADIUS , 
+                pos.x + NEIGHTBOUR_RADIUS , 
+                pos.y + NEIGHTBOUR_RADIUS);
         
         final NeighborAggregator visitor = new NeighborAggregator(boid);
         world.visitBoids( rect , visitor );
@@ -147,7 +146,7 @@ public class Main extends JFrame
         mean = mean.add( visitor.getAverageVelocity().multiply( ALIGNMENT_WEIGHT ) );
         
         // separation
-        mean = mean.add( visitor.getSeparationHeading().multiply( SEPARATION_WEIGHT ) );
+        mean = mean.add( visitor.getAverageSeparationHeading().multiply( SEPARATION_WEIGHT ) );
         
         return mean;
     }
@@ -215,6 +214,10 @@ public class Main extends JFrame
         @Override
         public void visit(Boid otherBoid)
         {
+            if ( boid == otherBoid ) {
+                return;
+            }
+            
             final double distance = otherBoid.getLocation().minus( boid.getLocation() ).length();
             
             if ( distance > NEIGHTBOUR_RADIUS ) {
@@ -226,14 +229,14 @@ public class Main extends JFrame
             locationSum = locationSum.add( otherBoid.getLocation() );
             velocitySum = velocitySum.add( otherBoid.getVelocity() );
 
-            // separation
             if ( distance != 0 && distance < SEPARATION_RADIUS ) {
                 separationSum = separationSum.add( boid.getLocation().minus( otherBoid.getLocation() ).normalize().divide( distance ) );
                 separationNeighbourCount++;
             }
         }
         
-        public Vec2d getSeparationHeading() 
+        // separation
+        public Vec2d getAverageSeparationHeading() 
         {
             if ( separationNeighbourCount == 0 ) {
                 return Vec2d.ORIGIN;                
@@ -241,7 +244,7 @@ public class Main extends JFrame
             return separationSum.divide( separationNeighbourCount );
         }        
         
-        public Vec2d getAverageVelocity() 
+        public Vec2d getAverageVelocity()  // alignment
         {
             if ( neighbourCount == 0 ) {
                 return Vec2d.ORIGIN;                
@@ -249,7 +252,7 @@ public class Main extends JFrame
             return velocitySum.divide( neighbourCount );
         }
         
-        public Vec2d getAverageLocation() 
+        public Vec2d getAverageLocation() // cohesion 
         {
             if ( neighbourCount == 0 ) {
                 return Vec2d.ORIGIN;
@@ -264,7 +267,7 @@ public class Main extends JFrame
         
         for ( int i = 0 ; i < POPULATION_SIZE ; i++ ) 
         {
-            final Boid boid = new Boid(createRandomPosition() , createRandomAcceleration() , createRandomSpeed() );
+            final Boid boid = new Boid(createRandomPosition() , createRandomAcceleration(), createRandomVelocity());
             world.add( boid );
         }
         return world;
@@ -287,7 +290,7 @@ public class Main extends JFrame
         return new Vec2d(x,y);
     }
     
-    private Vec2d createRandomSpeed() {
+    private Vec2d createRandomVelocity() {
         final double x = (rnd.nextDouble()-0.5)*MAX_SPEED;
         final double y = (rnd.nextDouble()-0.5)*MAX_SPEED;
         return new Vec2d(x,y);
@@ -362,7 +365,8 @@ public class Main extends JFrame
             final double lengthHeading=length*3;
             
             // create vector perpendicular to heading
-            final Vec2d rotated = boid.getHeading().rotate90DegreesCW();
+            Vec2d headingNormalized = boid.getVelocity().normalize();
+            final Vec2d rotated = headingNormalized.rotate90DegreesCW();
 
             /*      heading
              *        /\
@@ -376,7 +380,7 @@ public class Main extends JFrame
              */
             
             final Vec2d center = boid.getLocation();
-            final Vec2d heading = boid.getLocation().add( boid.getHeading().multiply( lengthHeading ) );
+            final Vec2d heading = boid.getLocation().add( headingNormalized.multiply( lengthHeading ) );
             final Vec2d p1 = center.add( rotated.multiply(length) );
             final Vec2d p2 = center.add( rotated.multiply( -length ) );
             
@@ -384,11 +388,11 @@ public class Main extends JFrame
             {
                 // draw neighbor radius
                 g.setColor(Color.GREEN );
-                drawCircle( center , NEIGHTBOUR_RADIUS , g );
+                drawCircle( boid.getNeighbourRadiusCenter() , NEIGHTBOUR_RADIUS , g );
                 
                 // draw separation radius
                 g.setColor(Color.RED);
-                drawCircle( center , SEPARATION_RADIUS , g );  
+                drawCircle( boid.getNeighbourRadiusCenter() , SEPARATION_RADIUS , g );  
 
                 // mark neighbors
                 final IBoidVisitor visitor = new IBoidVisitor() {
@@ -401,7 +405,7 @@ public class Main extends JFrame
                         }
                     }
                 };
-                world.visitBoids( center , NEIGHTBOUR_RADIUS , visitor );
+                world.visitBoids( boid.getNeighbourRadiusCenter() , NEIGHTBOUR_RADIUS , visitor );
             }
             
             g.setColor( color );   
