@@ -38,18 +38,21 @@ public class Main extends JFrame
     
     protected static final boolean DEBUG_PERFORMANCE = true;
 
-    protected static final double SEPARATION_RADIUS = 40;
-    protected static final double NEIGHBOUR_RADIUS = 100;
-
     protected static final double MAX_FORCE = 5;
     protected static final double MAX_SPEED = 10;     
 
     protected static final double COHESION_WEIGHT = 0.33d;
-    protected static final double SEPARATION_WEIGHT = 0.33d;
+    protected static final double SEPARATION_WEIGHT = 0.4d;
     protected static final double ALIGNMENT_WEIGHT = 0.33d;
+    protected static final double BORDER_FORCE_WEIGHT = 0.5d;
 
     protected static final double  MODEL_MAX = 3000;
-    protected static final int POPULATION_SIZE = 1000;
+    
+    protected static final double SEPARATION_RADIUS = 20;
+    protected static final double NEIGHBOUR_RADIUS = 100;
+    protected static final double BORDER_RADIUS = MODEL_MAX*0.1;    
+    
+    protected static final int POPULATION_SIZE = 4000;
     protected static final int  TILE_COUNT = 80;
 
     protected static final Object WORLD_LOCK = new Object();
@@ -167,7 +170,8 @@ public class Main extends JFrame
             @Override
             public void visit(Boid boid)
             {
-                final Vec2d newAcceleration = flock(boid); 
+                Vec2d newAcceleration = flock(boid); 
+                
                 final Vec2d newVelocity = boid.getVelocity().plus( newAcceleration ).limit( MAX_SPEED );
                 final Vec2d newLocation = boid.getLocation().plus( newVelocity ).wrapIfNecessary( MODEL_MAX );
                 newWorld.add( new Boid( newLocation , newAcceleration , newVelocity ) );
@@ -227,21 +231,46 @@ public class Main extends JFrame
         final NeighborAggregator visitor =new NeighborAggregator( boid );
         boid.visitNeighbors(world , NEIGHBOUR_RADIUS , visitor );
 
-        Vec2d mean = Vec2d.ORIGIN;
-
         // cohesion
         Vec2d cohesionVec = steerTo( boid , visitor.getAverageLocation() );
         
-        mean = mean.plus( cohesionVec.normalize().multiply( COHESION_WEIGHT ) );
-
         // alignment
         Vec2d alignmentVec = visitor.getAverageVelocity();
-        mean = mean.plus( alignmentVec.normalize().multiply( ALIGNMENT_WEIGHT ) );
 
         // separation
         Vec2d separationVec = visitor.getAverageSeparationHeading();
+
+        // border force
+        final Vec2d pos = boid.getLocation();
+        
+        Vec2d borderForce = Vec2d.ORIGIN;
+        if ( pos.x < BORDER_RADIUS ) 
+        {
+        	final double delta = (BORDER_RADIUS-pos.x) / BORDER_RADIUS;
+       		borderForce = new Vec2d( delta , 0 );
+        } else if ( pos.x > ( MODEL_MAX - BORDER_RADIUS ) ) 
+        {
+        	final double delta = (BORDER_RADIUS -( MODEL_MAX - pos.x )) / BORDER_RADIUS;
+       		borderForce = new Vec2d( -delta  , 0 );
+        }
+        
+        if ( pos.y < BORDER_RADIUS ) 
+        {
+        	final double delta = (BORDER_RADIUS-pos.y) / BORDER_RADIUS;
+       		borderForce = new Vec2d( borderForce.x, delta );
+        } else if ( pos.y > ( MODEL_MAX - BORDER_RADIUS ) ) 
+        {
+        	final double delta = (BORDER_RADIUS -( MODEL_MAX - pos.y )) / BORDER_RADIUS;
+       		borderForce = new Vec2d( borderForce.x , -delta  );
+        }        
+        
+        Vec2d mean = Vec2d.ORIGIN;
+        mean = mean.plus( cohesionVec.normalize().multiply( COHESION_WEIGHT ) );        
+        mean = mean.plus( alignmentVec.normalize().multiply( ALIGNMENT_WEIGHT ) );        
         mean = mean.plus( separationVec.normalize().multiply( SEPARATION_WEIGHT ) );
 
+      	mean = mean.plus( borderForce.multiply( BORDER_FORCE_WEIGHT ) );
+      	
         return mean;
     }
 
@@ -273,9 +302,9 @@ public class Main extends JFrame
         private int neighbourCount=0;
         private int separationNeighbourCount=0;
 
-        private Vec2d locationSum = new Vec2d(0,0);
-        private Vec2d velocitySum = new Vec2d(0,0);      
-        private Vec2d separationSum = new Vec2d(0,0);           
+        private Vec2d locationSum = Vec2d.ORIGIN;
+        private Vec2d velocitySum = Vec2d.ORIGIN;
+        private Vec2d separationSum = Vec2d.ORIGIN;
 
         public NeighborAggregator(Boid b) {
             this.boid = b;
