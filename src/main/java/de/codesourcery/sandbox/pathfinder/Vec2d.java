@@ -29,21 +29,22 @@ public class Vec2d
     public Vec2d limit(double maxValue) 
     {
         final double speed = length();
-        if ( speed > maxValue ) {
-            
-        } else {
+        if ( speed < maxValue ) {
             return this;
         }
         return normalize().multiply( maxValue );
     }
     
-    public Vec2d add(Vec2d o) {
+    public Vec2d plus(Vec2d o) {
         return new Vec2d(this.x+o.x,this.y+o.y);
     }
     
     public Vec2d normalize() 
     {
         double l = length();
+        if ( Math.abs( l ) < 0.00001 ) {
+            return this;
+        }
         return new Vec2d( x/l , y/l );
     }
     

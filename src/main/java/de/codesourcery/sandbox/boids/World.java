@@ -57,8 +57,12 @@ public final class World
             throw new IllegalArgumentException("boid must not be NULL.");
         }
         final Vec2 coords = modelToTile( boid.getLocation() );
-        allBoids.add( boid );
-        tiles[coords.x][coords.y].boids.add( boid );
+        synchronized( allBoids ) {
+            allBoids.add( boid );
+        }
+        synchronized(tiles[coords.x][coords.y]) {
+            tiles[coords.x][coords.y].boids.add( boid );
+        }
     }
         
     public interface IBoidVisitor 
@@ -72,57 +76,10 @@ public final class World
         }
     }
     
-    public void visitBoids(Vec2d center,double radius,IBoidVisitor visitor) {
-        
-        final double x1 = center.x - radius;
-        final double x2 = center.x + radius;
-        
-        final double y1 = center.y - radius;
-        final double y2 = center.y + radius;        
-        
-        Vec2 p1 = modelToTile( x1 , y1 ).wrapIfNecessary( tileCount );
-        Vec2 p2 = modelToTile( x2 , y2 ).wrapIfNecessary( tileCount );
-        
-        final int xMin;
-        final int xMax;
-        if ( p1.x < p2.x ) {
-            xMin = p1.x;
-            xMax = p2.x;
-        } else {
-            xMin = p2.x;
-            xMax = p1.x;            
-        }
-        
-        final int yMin;
-        final int yMax;
-        if ( p1.y < p2.y ) {
-            yMin = p1.y;
-            yMax = p2.y;
-        } else {
-            yMin = p2.y;
-            yMax = p1.y;            
-        }        
-        
-        for ( int x = xMin ; x <= xMax ; x++ ) 
-        {
-            for ( int y = yMin ; y <= yMax ; y++ ) 
-            {
-                for ( Boid b : tiles[x][y].boids ) 
-                {
-                    final double distance = b.getLocation().minus( center ).length();
-                    if ( distance < radius ) 
-                    {
-                        visitor.visit( b );
-                    }
-                }
-            }
-        }        
-    }
-    
     public void visitBoids(Rec2D modelRect,IBoidVisitor visitor) {
         
-        Vec2 p1 = modelToTile( modelRect.x1 , modelRect.y1 ).wrapIfNecessary( tileCount );
-        Vec2 p2 = modelToTile( modelRect.x2 , modelRect.y2 ).wrapIfNecessary( tileCount );
+        Vec2 p1 = modelToTile( modelRect.x1 , modelRect.y1 );
+        Vec2 p2 = modelToTile( modelRect.x2 , modelRect.y2 );
         
         final int xMin;
         final int xMax;
@@ -146,22 +103,47 @@ public final class World
         
         for ( int x = xMin ; x <= xMax ; x++ ) 
         {
+            final int tileX;
+            if ( x < 0 ) {
+                tileX = tileCount+x;
+            } else if ( x >= tileCount ) {
+                tileX = x-tileCount;
+            } else {
+                tileX = x;
+            }            
             for ( int y = yMin ; y <= yMax ; y++ ) 
             {
-                for ( Boid b : tiles[x][y].boids ) {
+                final int tileY;
+                if ( y < 0 ) {
+                    tileY = tileCount+y;
+                } else if ( y >= tileCount ) {
+                    tileY = y-tileCount;
+                } else {
+                    tileY = y;
+                }                
+                for ( Boid b : tiles[tileX][tileY].boids ) {
                     visitor.visit( b );
                 }
             }
         }
     }
     
-    private Vec2 modelToTile(Vec2d modelCoords) {
+    public List<Boid> getAllBoids()
+    {
+        return allBoids;
+    } 
+    
+    public int getPopulation() {
+        return this.allBoids.size();
+    }    
+    
+    public Vec2 modelToTile(Vec2d modelCoords) {
         final int x = (int) (modelCoords.x / xInc);
         final int y = (int) (modelCoords.y / yInc);
         return new Vec2(x,y);
     }
     
-    private Vec2 modelToTile( double modelX,double modelY) {
+    public Vec2 modelToTile( double modelX,double modelY) {
         final int x = (int) (modelX / xInc);
         final int y = (int) (modelY / yInc);
         return new Vec2(x,y);

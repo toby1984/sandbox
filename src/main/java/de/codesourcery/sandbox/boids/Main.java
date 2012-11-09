@@ -7,55 +7,103 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
+import java.util.ArrayList;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 import de.codesourcery.sandbox.boids.World.IBoidVisitor;
-import de.codesourcery.sandbox.pathfinder.Rec2D;
 import de.codesourcery.sandbox.pathfinder.Vec2d;
 
 public class Main extends JFrame
 {
-    public static final boolean DEBUG = true;
+    protected static final boolean DEBUG = true;
+
+    protected static final int THREAD_COUNT = Runtime.getRuntime().availableProcessors();
+
+    protected static final AtomicLong TICK_COUNTER = new AtomicLong(0);    
+    protected static final AtomicLong FRAME_COUNTER = new AtomicLong(0);
     
-    public static final double SEPARATION_RADIUS = 40;
-    public static final double NEIGHTBOUR_RADIUS = 60;
+    protected static final boolean DEBUG_PERFORMANCE = true;
+
+    protected static final double SEPARATION_RADIUS = 40;
+    protected static final double NEIGHBOUR_RADIUS = 100;
+
+    protected static final double MAX_FORCE = 4;
+    protected static final double MAX_SPEED = 4;     
+
+    protected static final double COHESION_WEIGHT = 0.33d;
+    protected static final double SEPARATION_WEIGHT = 1d;
+    protected static final double ALIGNMENT_WEIGHT = 0.33d;
+
+    protected static final double  MODEL_MAX = 3000;
+    protected static final int POPULATION_SIZE = 4000;
+    protected static final int  TILE_COUNT = 80;
+
+    protected static final Object WORLD_LOCK = new Object();
     
-    public static final double MAX_FORCE = 2;
-    
-    public static final double COHESION_WEIGHT = 0.05d;
-    public static final double SEPARATION_WEIGHT = 2d;
-    public static final double ALIGNMENT_WEIGHT = 0.08d;
-    
-    public static final double  MODEL_MAX = 1000;
-    public static final int  TILE_COUNT = 50;
-    public static final int POPULATION_SIZE = 150;
-    
-    public static final double MAX_SPEED = 3;    
-    
-    public static final int TICK_DELAY = 10;
-    
-    private static final Object WORLD_LOCK = new Object();
     private World world;
-    
+
     private final Random rnd = new Random(System.currentTimeMillis() );
-    
     private final MyPanel panel = new MyPanel();
-    
+    private final ExecutorService threadPool;
+    private final AtomicBoolean mayRender = new AtomicBoolean(true);
+    private final ScheduledThreadPoolExecutor vsyncThread;
+
+    public Main() 
+    {
+        System.out.println("Using "+THREAD_COUNT+" CPUs.");
+        
+        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>( 100 );
+
+        final ThreadFactory threadFactory = new ThreadFactory() {
+
+            @Override
+            public Thread newThread(Runnable r)
+            {
+                final Thread t= new Thread(r);
+                t.setDaemon( true );
+                return t;
+            }
+        };
+        threadPool = new ThreadPoolExecutor( THREAD_COUNT , THREAD_COUNT , 1 , TimeUnit.MINUTES , queue,threadFactory, new CallerRunsPolicy() );
+
+        final Runnable r = new Runnable() 
+        {
+            @Override
+            public void run()
+            {
+                mayRender.set( true );
+            }
+        };
+        
+        vsyncThread = new ScheduledThreadPoolExecutor(1); 
+        vsyncThread.scheduleAtFixedRate( r , 0 , 30 , TimeUnit.MILLISECONDS );
+    }
     
     public static void main(String[] args) throws Exception
     {
         new Main().run();
     }
-    
+
     public void run() throws Exception
     {
         setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-        
+
         panel.setPreferredSize(new Dimension(800,600));
-        
+
         getContentPane().setLayout( new GridBagLayout() );
         GridBagConstraints cnstrs = new GridBagConstraints();
         cnstrs.weightx=1.0;
@@ -65,97 +113,131 @@ public class Main extends JFrame
         cnstrs.fill = GridBagConstraints.BOTH;
         getContentPane().add( panel , cnstrs );
         pack();
-        
+
         setVisible(true);
         mainLoop();
     }
-    
+
     private void mainLoop() throws Exception 
     {
         synchronized( WORLD_LOCK ) {
             world = createWorld();
         }
-        
+
         // main loop
         while( true ) 
         {
-            synchronized( WORLD_LOCK ) {
-                world = tick();
-            }
-            panel.repaint();
-            if ( TICK_DELAY > 0 ) {
-                Thread.sleep(TICK_DELAY);
+            if ( mayRender.compareAndSet(true,false ) ) 
+            {            
+                synchronized( WORLD_LOCK ) 
+                {
+                    long time = -System.currentTimeMillis();
+                    world = tick();
+                    if ( DEBUG_PERFORMANCE ) 
+                    {
+                        time += System.currentTimeMillis();
+                        if ( ( TICK_COUNTER.incrementAndGet() % 10 ) == 0 ) {
+                            System.out.println("Calculation: "+time);
+                        }
+                    }
+                }
+                panel.repaint();
             }
         }        
     }
-    
-    private World tick() 
+
+    private World tick() throws InterruptedException 
     {
-        final World newWorld = new World(MODEL_MAX,TILE_COUNT);
+        final World newWorld = new World(MODEL_MAX,TILE_COUNT);    
         
-        Vec2d mousePosition = panel.getMouseLocation();
-        final Boid mouseBoid;
-        if ( mousePosition != null ) {
-            mouseBoid = new Boid( mousePosition , Vec2d.ORIGIN , Vec2d.ORIGIN );
-            world.add( mouseBoid );
-        } else {
-            mouseBoid=null;
-        }
-        
-        final IBoidVisitor visitor2 = new IBoidVisitor() {
-            
+        final IBoidVisitor visitor = new IBoidVisitor() {
+
             @Override
             public void visit(Boid boid)
             {
-                if ( boid == mouseBoid ) {
-                    return;
-                }
-                
-                final Vec2d pos0 = boid.getLocation();
-                final Vec2d v0 = boid.getVelocity();
-                
-                Vec2d newAcceleration = flock(boid); 
-                Vec2d newVelocity = v0.add( newAcceleration ).limit( MAX_SPEED );
-                Vec2d newLocation = pos0.add( newVelocity ).wrapIfNecessary( MODEL_MAX );
-
+                final Vec2d newAcceleration = flock(boid); 
+                final Vec2d newVelocity = boid.getVelocity().plus( newAcceleration ).limit( MAX_SPEED );
+                final Vec2d newLocation = boid.getLocation().plus( newVelocity ).wrapIfNecessary( MODEL_MAX );
                 newWorld.add( new Boid( newLocation , newAcceleration , newVelocity ) );
             }
         };
-        
-        world.visitAllBoids(visitor2);
+
+        final CountDownLatch latch = new CountDownLatch( THREAD_COUNT );
+        for ( final ArrayList<Boid> list : getBoidsPerThread() ) 
+        {
+            threadPool.submit( new Runnable() {
+                @Override
+                public void run()
+                {
+                    try {
+                        for ( Boid b : list ) {
+                            visitor.visit( b );
+                        }
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            });
+        }
+        latch.await();
         return newWorld;
     }
-    
+
+    // divide boids into separate lists, each being processed by a different thread      
+    private ArrayList<Boid>[] getBoidsPerThread()
+    {
+        @SuppressWarnings("unchecked")
+        final ArrayList<Boid>[] toProcess = new ArrayList[THREAD_COUNT ];
+
+        for ( int i = 0 ;i < THREAD_COUNT ; i++ ) {
+            toProcess[i] = new ArrayList<Boid>();
+        }
+
+        final int boidsPerThread = world.getPopulation() / THREAD_COUNT;
+        int index = 0;
+        int i = 0;
+        for ( Boid b : world.getAllBoids() ) 
+        {
+            toProcess[index].add( b );
+            i++;
+            if ( i > boidsPerThread ) {
+                i = 0;
+                if ( index < THREAD_COUNT ) {
+                    index++;
+                }
+            }
+        }
+        return toProcess;
+    }
+
     protected Vec2d flock(Boid boid)
     {
-        final Vec2d pos = boid.getNeighbourRadiusCenter();
-        final Rec2D rect = new Rec2D( pos.x - NEIGHTBOUR_RADIUS , 
-                pos.y - NEIGHTBOUR_RADIUS , 
-                pos.x + NEIGHTBOUR_RADIUS , 
-                pos.y + NEIGHTBOUR_RADIUS);
-        
-        final NeighborAggregator visitor = new NeighborAggregator(boid);
-        world.visitBoids( rect , visitor );
-        
+        final NeighborAggregator visitor =new NeighborAggregator( boid );
+        boid.visitNeighbors(world , NEIGHBOUR_RADIUS , visitor );
+
         Vec2d mean = Vec2d.ORIGIN;
-        
+
         // cohesion
-        mean = mean.add( steerTo( boid , visitor.getAverageLocation() ).multiply( COHESION_WEIGHT ) );
+        Vec2d cohesionVec = steerTo( boid , visitor.getAverageLocation() );
         
+        mean = mean.plus( cohesionVec.normalize().multiply( COHESION_WEIGHT ) );
+
         // alignment
-        mean = mean.add( visitor.getAverageVelocity().multiply( ALIGNMENT_WEIGHT ) );
-        
+        Vec2d alignmentVec = visitor.getAverageVelocity();
+        mean = mean.plus( alignmentVec.normalize().multiply( ALIGNMENT_WEIGHT ) );
+
         // separation
-        mean = mean.add( visitor.getAverageSeparationHeading().multiply( SEPARATION_WEIGHT ) );
-        
+        Vec2d separationVec = visitor.getAverageSeparationHeading().multiply( SEPARATION_WEIGHT );
+        mean = mean.plus( separationVec.normalize().multiply( SEPARATION_WEIGHT ) );
+
         return mean;
     }
-    
+
     private Vec2d steerTo(Boid boid , Vec2d target) 
     {
         Vec2d desiredDirection = target.minus( boid.getLocation() );
         final double distance = desiredDirection.length();
-        
+
         if ( distance > 0 ) 
         {
             desiredDirection = desiredDirection.normalize();
@@ -165,50 +247,31 @@ public class Main extends JFrame
             } else {
                 desiredDirection = desiredDirection.multiply( MAX_SPEED );
             }
-            
+
             Vec2d steer = desiredDirection.minus( boid.getVelocity() );
             steer = steer.limit( MAX_FORCE );
             return steer;
         }
         return Vec2d.ORIGIN;
-        
-        /*
-  steer_to: (target) ->
-    desired = Vector.subtract(target, @location) # A vector pointing from the location to the target
-    d = desired.magnitude()  # Distance from the target is the magnitude of the vector
-
-    # If the distance is greater than 0, calc steering (otherwise return zero vector)
-    if d > 0
-      desired.normalize()
-
-      # Two options for desired vector magnitude (1 -- based on distance, 2 -- maxspeed)
-      if d < 100.0
-        desired.multiply(MAX_SPEED*(d/100.0)) # This damping is somewhat arbitrary
-      else
-        desired.multiply(MAX_SPEED)
-
-      # Steering = Desired minus Velocity
-      steer = desired.subtract(@velocity)
-      steer.limit(MAX_FORCE)  # Limit to maximum steering force
-    else
-      steer = new Vector(0,0)
-
-    return steer         
-         */
     }
-    
-    private static class NeighborAggregator implements IBoidVisitor {
-        
+
+    public static class NeighborAggregator implements IBoidVisitor {
+
         private final Boid boid;
         private int neighbourCount=0;
         private int separationNeighbourCount=0;
-        
+
         private Vec2d locationSum = new Vec2d(0,0);
         private Vec2d velocitySum = new Vec2d(0,0);      
         private Vec2d separationSum = new Vec2d(0,0);           
-        
+
         public NeighborAggregator(Boid b) {
             this.boid = b;
+        }
+
+        public int getNeighbourCount()
+        {
+            return neighbourCount;
         }
 
         @Override
@@ -217,24 +280,24 @@ public class Main extends JFrame
             if ( boid == otherBoid ) {
                 return;
             }
-            
-            final double distance = otherBoid.getLocation().minus( boid.getLocation() ).length();
-            
-            if ( distance > NEIGHTBOUR_RADIUS ) {
+
+            final double distance = otherBoid.getLocation().minus( boid.getNeighbourCenter() ).length();
+
+            if ( distance > NEIGHBOUR_RADIUS ) {
                 return;
             }
-            
-            neighbourCount ++;
-            
-            locationSum = locationSum.add( otherBoid.getLocation() );
-            velocitySum = velocitySum.add( otherBoid.getVelocity() );
 
-            if ( distance != 0 && distance < SEPARATION_RADIUS ) {
-                separationSum = separationSum.add( boid.getLocation().minus( otherBoid.getLocation() ).normalize().divide( distance ) );
+            neighbourCount ++;
+
+            locationSum = locationSum.plus( otherBoid.getLocation() );
+            velocitySum = velocitySum.plus( otherBoid.getVelocity() );
+
+            if ( distance > 0 && distance < SEPARATION_RADIUS ) {
+                separationSum = separationSum.plus( boid.getNeighbourCenter().minus( otherBoid.getLocation() ).normalize().divide( distance/2 ) );
                 separationNeighbourCount++;
             }
         }
-        
+
         // separation
         public Vec2d getAverageSeparationHeading() 
         {
@@ -243,7 +306,7 @@ public class Main extends JFrame
             }
             return separationSum.divide( separationNeighbourCount );
         }        
-        
+
         public Vec2d getAverageVelocity()  // alignment
         {
             if ( neighbourCount == 0 ) {
@@ -251,7 +314,7 @@ public class Main extends JFrame
             }
             return velocitySum.divide( neighbourCount );
         }
-        
+
         public Vec2d getAverageLocation() // cohesion 
         {
             if ( neighbourCount == 0 ) {
@@ -264,7 +327,7 @@ public class Main extends JFrame
     private World createWorld() 
     {
         World world = new World(MODEL_MAX , TILE_COUNT ); // 20x20 tiles
-        
+
         for ( int i = 0 ; i < POPULATION_SIZE ; i++ ) 
         {
             final Boid boid = new Boid(createRandomPosition() , createRandomAcceleration(), createRandomVelocity());
@@ -272,7 +335,7 @@ public class Main extends JFrame
         }
         return world;
     }
-    
+
     private Vec2d createRandomPosition() 
     {
         if ( 1 != 2 ) {
@@ -282,64 +345,64 @@ public class Main extends JFrame
         final double y = rnd.nextDouble()* MODEL_MAX;
         return new Vec2d(x,y);
     }
-    
+
     private Vec2d createRandomAcceleration() {
-        
+
         final double x = (rnd.nextDouble()-0.5)*MAX_FORCE;
         final double y = (rnd.nextDouble()-0.5)*MAX_FORCE;
         return new Vec2d(x,y);
     }
-    
+
     private Vec2d createRandomVelocity() {
         final double x = (rnd.nextDouble()-0.5)*MAX_SPEED;
         final double y = (rnd.nextDouble()-0.5)*MAX_SPEED;
         return new Vec2d(x,y);
     }    
-    
+
     protected final class MyPanel extends JPanel {
-        
+
         private double xInc=1.0;
         private double yInc=1.0;
-        
+
         private volatile Vec2d mousePosition;
-        
+
         public MyPanel() 
         {
             addMouseMotionListener( new MouseMotionListener() {
-                
+
                 @Override
                 public void mouseMoved(MouseEvent e)
                 {
                     mousePosition = viewToModel( e.getX(), e.getY() );
                 }
-                
+
                 @Override
                 public void mouseDragged(MouseEvent e)
                 {
                 }
             });
         }
-        
+
         public Vec2d getMouseLocation() {
             return mousePosition;
         }
-        
+
         @Override
         public void paint(final Graphics g)
         {
             super.paint(g);
-            
+
             xInc = getWidth() / MODEL_MAX;
             yInc = getHeight() / MODEL_MAX;
-            
+
             synchronized( WORLD_LOCK ) 
             {
                 if ( world == null ) {
                     return;
                 }
-                
+
                 final IBoidVisitor visitor = new IBoidVisitor() {
-                    
+
                     private int count = 0;
                     @Override
                     public void visit(Boid boid)
@@ -348,22 +411,77 @@ public class Main extends JFrame
                         count++;
                     }
                 };
-                
+
                 g.setColor( Color.BLACK );
+                long time = -System.currentTimeMillis();
                 world.visitAllBoids( visitor );
+                if ( DEBUG_PERFORMANCE ) 
+                {
+                    time += System.currentTimeMillis();
+                    if ( ( FRAME_COUNTER.incrementAndGet() % 60 ) == 0 ) {
+                        System.out.println("Rendering: "+time+" ms");
+                    }
+                }
             }
         }
-        
+
         private void drawBoid(Boid boid, boolean firstBoid , Graphics g)
         {
-            drawBoid(boid,firstBoid,Color.BLACK,false , g);
+            drawBoid(boid,firstBoid,Color.BLACK,true , g);
         }
-        
-        private void drawBoid(final Boid boid, boolean firstBoid , Color color , boolean fill , final Graphics g)
+
+        private void drawBoid(final Boid boid, boolean isDebugBoid , Color color , boolean fill , final Graphics g)
         {
+            if ( DEBUG && isDebugBoid ) 
+            {
+                // draw neighbor radius
+                g.setColor(Color.GREEN );
+                drawCircle( boid.getNeighbourCenter() , NEIGHBOUR_RADIUS , g );
+
+                // draw separation radius
+                g.setColor(Color.RED);
+                drawCircle( boid.getNeighbourCenter() , SEPARATION_RADIUS , g );  
+
+                // mark neighbors
+                final NeighborAggregator visitor = new NeighborAggregator(boid) {
+
+                    @Override
+                    public void visit(Boid other)
+                    {
+                        if ( other != boid ) {
+                            super.visit(other);  
+
+                            final double distance = other.getLocation().minus( boid.getNeighbourCenter() ).length();
+
+                            if ( distance > NEIGHBOUR_RADIUS ) {
+                                return;
+                            }                            
+                            drawBoid( other , false , Color.PINK , true, g );
+                        }
+                    }
+                };
+                boid.visitNeighbors( world , NEIGHBOUR_RADIUS , visitor );
+
+                // cohesion
+                Vec2d cohesionVec = steerTo( boid , visitor.getAverageLocation() );
+
+                g.setColor(Color.CYAN);
+                drawVec( boid.getLocation() , boid.getLocation().plus( cohesionVec ) , g );
+
+                // alignment
+                Vec2d alignmentVec = visitor.getAverageVelocity();
+                g.setColor(Color.BLUE);
+                drawVec( boid.getLocation() , boid.getLocation().plus( alignmentVec ) , g );
+
+                // separation
+                Vec2d separationVec = visitor.getAverageSeparationHeading();
+                g.setColor(Color.MAGENTA);
+                drawVec( boid.getLocation() , boid.getLocation().plus( separationVec ) , g );                
+            }
+
             final double length=10;
             final double lengthHeading=length*3;
-            
+
             // create vector perpendicular to heading
             Vec2d headingNormalized = boid.getVelocity().normalize();
             final Vec2d rotated = headingNormalized.rotate90DegreesCW();
@@ -378,87 +496,76 @@ public class Main extends JFrame
              * p1 +----+----+ p2
              *        center
              */
-            
-            final Vec2d center = boid.getLocation();
-            final Vec2d heading = boid.getLocation().add( headingNormalized.multiply( lengthHeading ) );
-            final Vec2d p1 = center.add( rotated.multiply(length) );
-            final Vec2d p2 = center.add( rotated.multiply( -length ) );
-            
-            if ( DEBUG && firstBoid ) 
-            {
-                // draw neighbor radius
-                g.setColor(Color.GREEN );
-                drawCircle( boid.getNeighbourRadiusCenter() , NEIGHTBOUR_RADIUS , g );
-                
-                // draw separation radius
-                g.setColor(Color.RED);
-                drawCircle( boid.getNeighbourRadiusCenter() , SEPARATION_RADIUS , g );  
 
-                // mark neighbors
-                final IBoidVisitor visitor = new IBoidVisitor() {
-                    
-                    @Override
-                    public void visit(Boid other)
-                    {
-                        if ( other != boid ) {
-                            drawBoid( other , false , Color.PINK , true, g );
-                        }
-                    }
-                };
-                world.visitBoids( boid.getNeighbourRadiusCenter() , NEIGHTBOUR_RADIUS , visitor );
-            }
-            
+            final Vec2d center = boid.getLocation();
+            final Vec2d heading = boid.getLocation().plus( headingNormalized.multiply( lengthHeading ) );
+            final Vec2d p1 = center.plus( rotated.multiply(length) );
+            final Vec2d p2 = center.plus( rotated.multiply( -length ) );
+
             g.setColor( color );   
             drawPoly( fill , g , p1,heading,p2);
         }     
-        
+
+        private void drawVec(Vec2d src, Vec2d dst, Graphics g) {
+
+            Vec2d direction = dst.minus( src ).normalize();
+
+            Vec2d arrowEnd = src.plus( direction.multiply( 55 ) );
+            Vec2d arrowStart = src.plus( direction.multiply( 45 ) );
+            drawLine( src , arrowEnd , g );
+
+            // draw arrow head
+            Vec2d headBase = direction.multiply(10);
+            Vec2d p1 = arrowStart.plus( headBase.rotate90DegreesCCW() );
+            Vec2d p2 = arrowStart.minus( headBase.rotate90DegreesCCW() );
+            drawPoly( true , g , p1 , arrowEnd , p2 );
+        }
+
         private void drawPoly(boolean fill , Graphics g, Vec2d... points) 
         {
             final int x[] = new int[points.length];
             final int y[] = new int[points.length];
-            
+
             for ( int i = 0 ; i < points.length ; i++ ) 
             {
                 x[i] = (int) Math.round(points[i].x * xInc);
                 y[i] = (int) Math.round(points[i].y * yInc);
-                
+
             }
-            
+
             if ( fill ) {
                 g.fillPolygon( x , y , points.length );
             } else {
                 g.drawPolygon( x , y , points.length );
             }
         }         
-        
-        @SuppressWarnings("unused")
+
         private void drawLine(Vec2d p1,Vec2d p2,Graphics g) {
-            
+
             final int x1 = (int) Math.round(p1.x * xInc);
             final int y1 = (int) Math.round(p1.y * yInc);
-            
+
             final int x2 = (int) Math.round(p2.x * xInc);
             final int y2 = (int) Math.round(p2.y * yInc);
             g.drawLine( x1,y1,x2,y2);
         }        
-        
+
         private Vec2d viewToModel(int x,int y) {
             return new Vec2d( x / xInc , y / yInc );
         }
-        
+
         private void drawCircle(Vec2d center, double boidNeightbourRadius, Graphics g)
         {
             final double x1 = (center.x - boidNeightbourRadius)*xInc;
             final double y1 = (center.y - boidNeightbourRadius)*yInc;
-            
+
             final double x2 = (center.x + boidNeightbourRadius)*xInc;
             final double y2 = (center.y + boidNeightbourRadius)*yInc;            
-            
+
             g.fillOval( round(x1) , round(y1) , round(x2-x1) , round(y2-y1) ); 
         }
-
     }
-    
+
     private static final int round(double d) {
         return (int) Math.round(d);
     }
