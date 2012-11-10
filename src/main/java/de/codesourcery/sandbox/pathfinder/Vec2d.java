@@ -9,12 +9,17 @@ public class Vec2d
     public final double x;
     public final double y;
 
+    public Vec2d(Vec2dMutable v)
+    {
+    	this.x = v.x;
+    	this.y = v.y;
+    }
+    
     public Vec2d(double x, double y)
     {
         this.x = x;
         this.y = y;
     }
-    
 
     public Vec2d rotate90DegreesCW() {
         // The right-hand normal of vector (x, y) is (y, -x), and the left-hand normal is (-y, x)
@@ -34,6 +39,14 @@ public class Vec2d
         }
         return normalize().multiply( maxValue );
     }
+    
+    public Vec2d plus(Vec2dMutable o) {
+        return new Vec2d(this.x+o.x,this.y+o.y);
+    }
+    
+    public Vec2dMutable plusInPlace(Vec2dMutable o) {
+        return new Vec2dMutable(this.x+o.x,this.y+o.y);
+    }    
     
     public Vec2d plus(Vec2d o) {
         return new Vec2d(this.x+o.x,this.y+o.y);
@@ -85,6 +98,13 @@ public class Vec2d
     public Vec2d minus(Vec2d o) {
         return new Vec2d(this.x-o.x,this.y-o.y);
     }    
+    
+    public double distanceTo(Vec2d other) 
+    {
+    	final double dx = other.x - this.x;
+    	final double dy = other.y - this.y;
+    	return Math.sqrt( dx*dx + dy*dy);
+    }
 
     public double length() {
         return Math.sqrt( x*x + y*y );

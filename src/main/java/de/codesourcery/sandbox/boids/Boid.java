@@ -3,12 +3,20 @@ package de.codesourcery.sandbox.boids;
 import de.codesourcery.sandbox.boids.Main.NeighborAggregator;
 import de.codesourcery.sandbox.pathfinder.Rec2D;
 import de.codesourcery.sandbox.pathfinder.Vec2d;
+import de.codesourcery.sandbox.pathfinder.Vec2dMutable;
 
 public final class Boid
 {
     private final Vec2d acceleration;
     private final Vec2d location;
     private final Vec2d velocity;    
+    
+    public Boid(Vec2dMutable location, Vec2dMutable acceleration,Vec2dMutable velocity)
+    {
+    	this.acceleration = new Vec2d( acceleration );
+    	this.location = new Vec2d( location );
+    	this.velocity = new Vec2d( velocity );
+    }
     
     public Boid(Vec2d position, Vec2d acceleration,Vec2d velocity)
     {

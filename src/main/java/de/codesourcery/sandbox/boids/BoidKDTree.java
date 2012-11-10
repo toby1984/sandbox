@@ -321,14 +321,15 @@ public class BoidKDTree<T>
             if ( ! gatherer.isFull() ) {
                 // check if the other subtree may contain values that are closer 
                 // than the point farthest out we've found so far
-                final double distance;
+                double distance=0;
                 if ( xAxis ) {
                     distance = Math.abs( gatherer.x - splitValue );
                 } else {
                     distance = Math.abs( gatherer.y - splitValue );
                 }
 
-                final boolean isWithinRadius= distance <= gatherer.radius ;
+                final boolean isWithinRadius=distance <= gatherer.radius;
+                
                 if ( right != null && isWithinRadius && visitedTree == LEFT ) {
                     if ( right.isLeaf() ) {
                         gatherer.addCandidate( (LeafNode<T>) right);
@@ -357,7 +358,6 @@ public class BoidKDTree<T>
 
         private int valueCount = 0;
         public final int maxNeighborCount;
-        public double maxDistanceSquared=0;
 
         private final PriorityQueue<NodeWithDistance<T>> queue;
 
@@ -396,9 +396,6 @@ public class BoidKDTree<T>
 
             double distanceSquared = dx+dy;
             if ( distanceSquared < radiusSquared ) { 
-                if ( dx > maxDistanceSquared ) {
-                    maxDistanceSquared = distanceSquared;
-                }
                 valueCount += node.getValueCount();
                 queue.add( new NodeWithDistance<T>(node,distanceSquared ) );
             }
@@ -634,7 +631,7 @@ public class BoidKDTree<T>
         final BoidKDTree<Vec2d> tree = new BoidKDTree<Vec2d>();
 
         Random rnd = new Random(System.currentTimeMillis());
-        for ( int i = 0 ; i < 10 ; i++ ) 
+        for ( int i = 0 ; i < 1000 ; i++ ) 
         {
             final double x = rnd.nextDouble()*MODEL_WIDTH;
             final double y = rnd.nextDouble()*MODEL_HEIGHT;
@@ -695,8 +692,8 @@ public class BoidKDTree<T>
             xInc = getWidth() / MODEL_WIDTH;
             yInc = getHeight() / MODEL_HEIGHT;
 
-//            render((Graphics2D) g);
-            renderTree((Graphics2D) g);
+            render((Graphics2D) g);
+//            renderTree((Graphics2D) g);
         }
 
         private void renderTree(final Graphics2D g)

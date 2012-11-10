@@ -3,32 +3,26 @@ package de.codesourcery.sandbox.boids;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
-import de.codesourcery.sandbox.pathfinder.Rec2D;
-import de.codesourcery.sandbox.pathfinder.Vec2;
 import de.codesourcery.sandbox.pathfinder.Vec2d;
 
 public final class World
 {
-    private final BoidKDTree<Boid> tiles = new BoidKDTree<Boid>();
+    private final BoidKDTree<Boid> tree = new BoidKDTree<Boid>();
     private final List<Boid> allBoids = new ArrayList<>();
     
     public World() {
     } 
-        
-    public void add(Boid boid) {
     
-        if (boid == null) {
-            throw new IllegalArgumentException("boid must not be NULL.");
-        }
+    public void add(Boid boid) 
+    {
         synchronized( allBoids ) {
-            allBoids.add( boid );
+        	allBoids.add( boid );
         }
+        
         final Vec2d loc = boid.getLocation();        
-        synchronized( tiles ) 
+        synchronized( tree ) 
         {
-            tiles.add( loc.x , loc.y , boid );
+            tree.add( loc.x , loc.y , boid );
         }
     }
         
@@ -46,7 +40,7 @@ public final class World
     
     public void visitBoids(double x , double y , double maxRadius,IBoidVisitor visitor) 
     {
-        final List<Boid> closestNeighbours = tiles.findClosestNeighbours( x , y , maxRadius , 10 );
+        final List<Boid> closestNeighbours = tree.findClosestNeighbours( x , y , maxRadius , 10 );
         for ( Boid b : closestNeighbours ) {
             visitor.visit( b );
         }
