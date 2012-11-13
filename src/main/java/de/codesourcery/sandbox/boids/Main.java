@@ -3,6 +3,7 @@ package de.codesourcery.sandbox.boids;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.event.MouseEvent;
@@ -36,7 +37,7 @@ public class Main extends JFrame
     protected static final AtomicLong TICK_COUNTER = new AtomicLong(0);    
     protected static final AtomicLong FRAME_COUNTER = new AtomicLong(0);
     
-    protected static final boolean DEBUG_PERFORMANCE = true;
+    protected static final boolean DEBUG_PERFORMANCE = false;
 
     protected static final double MAX_FORCE = 5;
     protected static final double MAX_SPEED = 10;     
@@ -52,8 +53,7 @@ public class Main extends JFrame
     protected static final double NEIGHBOUR_RADIUS = 100;
     protected static final double BORDER_RADIUS = MODEL_MAX*0.1;    
     
-    protected static final int POPULATION_SIZE = 4000;
-    protected static final int  TILE_COUNT = 80;
+    protected static final int POPULATION_SIZE = 9000;
 
     protected static final Object WORLD_LOCK = new Object();
     
@@ -68,6 +68,7 @@ public class Main extends JFrame
     public Main() 
     {
         System.out.println("Using "+THREAD_COUNT+" CPUs.");
+        System.setProperty( "sun.java2d.opengl" , "true" );
         
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>( 100 );
 
@@ -163,7 +164,7 @@ public class Main extends JFrame
 
     private World tick() throws InterruptedException 
     {
-        final World newWorld = new World(MODEL_MAX,TILE_COUNT);    
+        final World newWorld = new World();
         
         final IBoidVisitor visitor = new IBoidVisitor() {
 
@@ -367,7 +368,7 @@ public class Main extends JFrame
 
     private World createWorld() 
     {
-        World world = new World(MODEL_MAX , TILE_COUNT ); // 20x20 tiles
+        World world = new World(); // 20x20 tiles
 
         for ( int i = 0 ; i < POPULATION_SIZE ; i++ ) 
         {
@@ -437,24 +438,26 @@ public class Main extends JFrame
             xInc = getWidth() / MODEL_MAX;
             yInc = getHeight() / MODEL_MAX;
 
+            final Graphics2D graphics = (Graphics2D) g;
+            
+            final IBoidVisitor visitor = new IBoidVisitor() {
+
+                private int count = 0;
+                @Override
+                public void visit(Boid boid)
+                {
+                    drawBoid( boid ,count == 0 ,graphics );
+                    count++;
+                }
+            };
+            
+            g.setColor( Color.BLACK );
             synchronized( WORLD_LOCK ) 
             {
                 if ( world == null ) {
                     return;
                 }
-
-                final IBoidVisitor visitor = new IBoidVisitor() {
-
-                    private int count = 0;
-                    @Override
-                    public void visit(Boid boid)
-                    {
-                        drawBoid( boid ,count == 0 ,g );
-                        count++;
-                    }
-                };
-
-                g.setColor( Color.BLACK );
+                
                 long time = -System.currentTimeMillis();
                 world.visitAllBoids( visitor );
                 if ( DEBUG_PERFORMANCE ) 
@@ -467,12 +470,12 @@ public class Main extends JFrame
             }
         }
 
-        private void drawBoid(Boid boid, boolean firstBoid , Graphics g)
+        private void drawBoid(Boid boid, boolean firstBoid , Graphics2D g)
         {
             drawBoid(boid,firstBoid,Color.BLUE,true , g);
         }
 
-        private void drawBoid(final Boid boid, boolean isDebugBoid , Color color , boolean fill , final Graphics g)
+        private void drawBoid(final Boid boid, boolean isDebugBoid , Color color , boolean fill , final Graphics2D g)
         {
             if ( DEBUG && isDebugBoid ) 
             {
@@ -544,7 +547,7 @@ public class Main extends JFrame
             final Vec2d p1 = center.plus( rotated.multiply(length) );
             final Vec2d p2 = center.plus( rotated.multiply( -length ) );
 
-            g.setColor( color );   
+            g.setColor( color );
             drawPoly( fill , g , p1,heading,p2);
         }     
 
@@ -563,22 +566,24 @@ public class Main extends JFrame
             drawPoly( true , g , p1 , arrowEnd , p2 );
         }
 
-        private void drawPoly(boolean fill , Graphics g, Vec2d... points) 
+        private void drawPoly(boolean fill , Graphics g, Vec2d p1,Vec2d p2,Vec2d p3) 
         {
-            final int x[] = new int[points.length];
-            final int y[] = new int[points.length];
+            final int x[] = new int[3];
+            final int y[] = new int[3];
 
-            for ( int i = 0 ; i < points.length ; i++ ) 
-            {
-                x[i] = (int) Math.round(points[i].x * xInc);
-                y[i] = (int) Math.round(points[i].y * yInc);
+            x[0] = (int) Math.round(p1.x * xInc);
+            y[0] = (int) Math.round(p1.y * yInc);
 
-            }
+            x[1] = (int) Math.round(p2.x * xInc);
+            y[1] = (int) Math.round(p2.y * yInc);
+            
+            x[2] = (int) Math.round(p3.x * xInc);
+            y[2] = (int) Math.round(p3.y * yInc);            
 
             if ( fill ) {
-                g.fillPolygon( x , y , points.length );
+                g.fillPolygon( x , y , 3 );
             } else {
-                g.drawPolygon( x , y , points.length );
+                g.drawPolygon( x , y , 3 );
             }
         }         
 

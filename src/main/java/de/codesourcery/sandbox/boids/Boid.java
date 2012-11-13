@@ -40,11 +40,6 @@ public final class Boid
     public void visitNeighbors(World world , double neighborRadius,NeighborAggregator visitor) 
     {
         final Vec2d pos = getNeighbourCenter();
-        final Rec2D rect = new Rec2D( pos.x - neighborRadius , 
-                pos.y - neighborRadius , 
-                pos.x + neighborRadius , 
-                pos.y + neighborRadius);
-        
-        world.visitBoids( rect , visitor );
+        world.visitBoids( pos.x , pos.y , neighborRadius  , visitor );
     }
 }
