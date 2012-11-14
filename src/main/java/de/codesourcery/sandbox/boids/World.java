@@ -20,10 +20,7 @@ public final class World
         }
         
         final Vec2d loc = boid.getLocation();        
-        synchronized( tree ) 
-        {
-            tree.add( loc.x , loc.y , boid );
-        }
+        tree.add( loc.x , loc.y , boid );
     }
         
     public interface IBoidVisitor 

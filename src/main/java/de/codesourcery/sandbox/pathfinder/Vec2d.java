@@ -117,7 +117,6 @@ public class Vec2d
 
     public float angleInRad(Vec2d other) {
         double f = dotProduct(other) / ( this.length() * other.length() );
-        System.out.println("f="+f);
         return (float) Math.acos(f);
     }
 

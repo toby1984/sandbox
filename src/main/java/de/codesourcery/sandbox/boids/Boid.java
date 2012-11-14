@@ -7,9 +7,9 @@ import de.codesourcery.sandbox.pathfinder.Vec2dMutable;
 
 public final class Boid
 {
-    private final Vec2d acceleration;
-    private final Vec2d location;
-    private final Vec2d velocity;    
+    public final Vec2d acceleration;
+    public final Vec2d location;
+    public final Vec2d velocity;    
     
     public Boid(Vec2dMutable location, Vec2dMutable acceleration,Vec2dMutable velocity)
     {

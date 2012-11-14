@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -38,6 +39,8 @@ public class BoidKDTree<T>
 
     public static abstract class TreeNode<T> 
     {
+        private final AtomicBoolean lock = new AtomicBoolean(false);
+
         public abstract void add(double x,double y,int depth , LeafNode<T> value);
 
         public abstract boolean isLeaf();
@@ -48,7 +51,16 @@ public class BoidKDTree<T>
 
         public abstract void visitPreOrder(KDLeafVisitor<T> visitor);        
 
-        public abstract void findNearestNeighbors(int depth , NearestNeighborGatherer<T> gatherer);         
+        public abstract void findNearestNeighbors(int depth , NearestNeighborGatherer<T> gatherer);  
+
+        protected void lock() 
+        {
+            while( ! lock.compareAndSet( false , true ) );
+        }
+
+        protected void unlock() {
+            lock.set( false );
+        }
     }
 
     public interface KDTreeVisitor<T> {
@@ -78,7 +90,7 @@ public class BoidKDTree<T>
         public final void visitPreOrder(int x , int y , KDXYTreeVisitor<T> visitor) 
         {
             visitor.visit( x , y , this );
-            
+
             if ( left != null ) {
                 left.visitPreOrder( x , y+1 , visitor );
             }
@@ -106,8 +118,10 @@ public class BoidKDTree<T>
                 if ( x < splitValue ) 
                 {
                     // left subtree
+                    lock();
                     if ( left == null ) {
                         left = value;
+                        unlock();
                     } 
                     else 
                     {
@@ -130,7 +144,11 @@ public class BoidKDTree<T>
                                 newNode.add( x , y , depth +1 , value );
                                 left = newNode;
                             }
+
+                            unlock();
+
                         } else {
+                            unlock();
                             left.add( x ,  y ,  depth + 1 , value );
                         } 
                     }
@@ -138,9 +156,13 @@ public class BoidKDTree<T>
                 else 
                 {
                     // right subtree
+                    lock();
                     if ( right == null ) {
                         right = value;
-                    } else {
+                        unlock();
+                    } 
+                    else 
+                    {
                         if ( right.isLeaf() ) 
                         {
                             // right == leaf node , split at Y-axis and re-insert
@@ -160,7 +182,9 @@ public class BoidKDTree<T>
                                 newNode.add( x , y , depth +1 , value );
                                 right = newNode;
                             }
+                            unlock();
                         } else {
+                            unlock();
                             right.add( x ,  y ,  depth + 1 , value );
                         } 
                     }                    
@@ -170,8 +194,10 @@ public class BoidKDTree<T>
                 if ( y < splitValue ) 
                 {
                     // left subtree
+                    lock();
                     if ( left == null ) {
                         left = value;
+                        unlock();
                     } 
                     else 
                     {
@@ -193,7 +219,11 @@ public class BoidKDTree<T>
                                 newNode.add( x , y , depth +1 , value );
                                 left = newNode;
                             }
-                        } else {
+                            unlock();                            
+                        } 
+                        else 
+                        {
+                            unlock();
                             left.add( x ,  y ,  depth + 1 , value );
                         } 
                     }
@@ -201,8 +231,10 @@ public class BoidKDTree<T>
                 else 
                 {
                     // right subtree
+                    lock();
                     if ( right == null ) {
                         right = value;
+                        unlock();
                     } else {
                         if ( right.isLeaf() ) {
                             // right == leaf node , split at X-axis and re-insert
@@ -221,7 +253,9 @@ public class BoidKDTree<T>
                                 newNode.add( x , y , depth +1 , value );
                                 right = newNode;
                             }
+                            unlock();
                         } else {
+                            unlock();
                             right.add( x ,  y ,  depth + 1 , value );
                         } 
                     }                    
@@ -318,18 +352,20 @@ public class BoidKDTree<T>
                 }                
             }
 
-            if ( ! gatherer.isFull() ) {
-                // check if the other subtree may contain values that are closer 
-                // than the point farthest out we've found so far
-                double distance=0;
+            // check if the other subtree may contain values that are closer 
+            // than the point farthest out we've found so far
+            
+            if ( ! gatherer.isFull() ) 
+            {
+                final boolean isWithinRadius;
                 if ( xAxis ) {
-                    distance = Math.abs( gatherer.x - splitValue );
+                    double distance = gatherer.x - splitValue;
+                    isWithinRadius=distance <= gatherer.radius;
                 } else {
-                    distance = Math.abs( gatherer.y - splitValue );
+                    double distance = gatherer.y - splitValue;
+                    isWithinRadius=distance <= gatherer.radius;
                 }
-
-                final boolean isWithinRadius=distance <= gatherer.radius;
-                
+    
                 if ( right != null && isWithinRadius && visitedTree == LEFT ) {
                     if ( right.isLeaf() ) {
                         gatherer.addCandidate( (LeafNode<T>) right);
@@ -355,8 +391,6 @@ public class BoidKDTree<T>
         public final double y;
         public final double radius;
         public final double radiusSquared;
-
-        private int valueCount = 0;
         public final int maxNeighborCount;
 
         private final PriorityQueue<NodeWithDistance<T>> queue;
@@ -384,19 +418,19 @@ public class BoidKDTree<T>
             }
             return result;
         }
-
+        
         public boolean isFull() {
-            return valueCount > 50;
+            return queue.size() >= maxNeighborCount;
         }
 
         public void addCandidate(LeafNode<T> node) 
         {
-            double dx = (x - node.x)*(x - node.x);
-            double dy = (y - node.y)*(y - node.y);
+            double dx = x - node.x;
+            double dy = y - node.y;
 
-            double distanceSquared = dx+dy;
-            if ( distanceSquared < radiusSquared ) { 
-                valueCount += node.getValueCount();
+            double distanceSquared = dx*dx+dy*dy;
+            if ( distanceSquared < radiusSquared ) 
+            {
                 queue.add( new NodeWithDistance<T>(node,distanceSquared ) );
             }
         }
@@ -549,11 +583,13 @@ public class BoidKDTree<T>
         @Override
         public void add(double x, double y, int depth, LeafNode<T> node)
         {
+            lock();
             if ( node.supportsMultipleValues() ) {
                 values.addAll( ((MultiValuedLeafNode<T>) node).values );                
             } else {
                 values.add( ((SingleValueLeafNode<T>) node).value );
             }
+            unlock();
         }
 
         @Override
@@ -631,7 +667,7 @@ public class BoidKDTree<T>
         final BoidKDTree<Vec2d> tree = new BoidKDTree<Vec2d>();
 
         Random rnd = new Random(System.currentTimeMillis());
-        for ( int i = 0 ; i < 1000 ; i++ ) 
+        for ( int i = 0 ; i < 100 ; i++ ) 
         {
             final double x = rnd.nextDouble()*MODEL_WIDTH;
             final double y = rnd.nextDouble()*MODEL_HEIGHT;
@@ -647,7 +683,7 @@ public class BoidKDTree<T>
             public void mouseClicked(java.awt.event.MouseEvent e) 
             {
                 final Vec2d p = panel.viewToModel( e.getX() , e.getY() );
-                panel.mark( p.x , p.y , 25 );
+                panel.mark( p.x , p.y , 55 );
             };
         } );  
 
@@ -693,23 +729,23 @@ public class BoidKDTree<T>
             yInc = getHeight() / MODEL_HEIGHT;
 
             render((Graphics2D) g);
-//            renderTree((Graphics2D) g);
+            //            renderTree((Graphics2D) g);
         }
 
         private void renderTree(final Graphics2D g)
         {
             final double xCenter = MODEL_WIDTH / 2.0;
-            
+
             final double columnWidth = MODEL_WIDTH / 40.0;
             final double rowHeight = MODEL_HEIGHT / 40.0;
-            
+
             final int[] leafCount={0};
             final KDXYTreeVisitor<Vec2d> leafVisitor = new KDXYTreeVisitor<Vec2d>() {
 
                 @Override
                 public void visit(int x, int y, TreeNode<Vec2d> node)
                 {
-//                    System.out.println("x="+x+" / y = "+y+" "+( node.isLeaf() ? " <<<<" : "")+" , parent = "+parent);
+                    //                    System.out.println("x="+x+" / y = "+y+" "+( node.isLeaf() ? " <<<<" : "")+" , parent = "+parent);
                     final double modelX = xCenter + ( x * columnWidth );
                     final double modelY = 10.0 + ( y * rowHeight );
                     if ( node.isLeaf() ) {
@@ -721,12 +757,12 @@ public class BoidKDTree<T>
                     drawCircle( modelX , modelY , 4 , g );
                 }
             };
-            
+
             tree.visitPreOrder( leafVisitor );
-            
+
             System.out.println("Leafs: "+leafCount[0]);
         }
-        
+
         private void render(final Graphics2D g)
         {
             final KDLeafVisitor<Vec2d> visitor = new KDLeafVisitor<Vec2d>() {
@@ -737,7 +773,7 @@ public class BoidKDTree<T>
                     drawPoint( new Vec2d( node.x , node.y ) , g );
                 }
             };
-            
+
             g.setColor( Color.black );
             tree.visitPreOrder( visitor );
 
@@ -746,7 +782,7 @@ public class BoidKDTree<T>
                 drawCircle(markX,markY,markRadius,g);
 
                 long time1 = -System.currentTimeMillis();
-                final List<Vec2d> neighbours = tree.findClosestNeighbours( markX,markY,markRadius, 50 );
+                final List<Vec2d> neighbours = tree.findClosestNeighbours( markX,markY,markRadius, 5 );
                 time1 += System.currentTimeMillis();
                 System.out.println("Time: "+time1);
                 double maxDistance = 0;
@@ -779,7 +815,7 @@ public class BoidKDTree<T>
             final double viewRadius = radius * xInc;
             final double x1 = p.x - viewRadius;
             final double y1 = p.y - viewRadius;
-//            System.out.println("Drawing circle at "+x+" , "+y);
+            //            System.out.println("Drawing circle at "+x+" , "+y);
             g.drawOval( round(x1) , round(y1) , round(viewRadius*2) , round(viewRadius*2) ); 
         }        
 
