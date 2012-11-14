@@ -45,14 +45,14 @@ public class Main extends JFrame
     protected static final boolean DEBUG_PERFORMANCE = true;
 
     protected static final double MAX_FORCE = 5;
-    protected static final double MAX_SPEED = 10;     
+    protected static final double MAX_SPEED = 25;     
 
     protected static final double COHESION_WEIGHT = 0.33d;
     protected static final double SEPARATION_WEIGHT = 0.4d;
     protected static final double ALIGNMENT_WEIGHT = 0.33d;
-    protected static final double BORDER_FORCE_WEIGHT = 0.5d;
+    protected static final double BORDER_FORCE_WEIGHT = 1d;
 
-    protected static final double  MODEL_MAX = 3000;
+    protected static final double  MODEL_MAX = 5000;
 
     protected static final double SEPARATION_RADIUS = 20;
     protected static final double NEIGHBOUR_RADIUS = 100;
@@ -61,7 +61,7 @@ public class Main extends JFrame
     public static final double ARROW_WIDTH=10;
     public static final double ARROW_LENGTH=ARROW_WIDTH*3;
 
-    protected static final int POPULATION_SIZE = 21000;
+    protected static final int POPULATION_SIZE = 25000;
 
     private World world;
 
@@ -166,11 +166,13 @@ public class Main extends JFrame
 
     private World tick() throws InterruptedException 
     {
-        final CountDownLatch workerThreads = new CountDownLatch( THREAD_COUNT );
+    	final int unitCount = THREAD_COUNT;
+    	
+        final CountDownLatch workerThreads = new CountDownLatch( unitCount );
 
         final World newWorld = new World();
 
-        for ( final ArrayList<Boid> inputList : slice( world.getAllBoids() , THREAD_COUNT ) ) 
+        for ( final ArrayList<Boid> inputList : slice( world.getAllBoids() , unitCount ) ) 
         {
             threadPool.submit( new Runnable() 
             {
@@ -212,15 +214,17 @@ public class Main extends JFrame
 
         final int boidsPerThread = allBoids.size() / listCount;
         int index = 0;
+        ArrayList<Boid> currentList = toProcess[0];
         int i = 0;
         for ( Boid b : allBoids ) 
         {
-            toProcess[index].add( b );
+            currentList.add( b );
             i++;
             if ( i > boidsPerThread ) {
                 i = 0;
                 if ( index < listCount ) {
                     index++;
+                    currentList = toProcess[index];
                 }
             }
         }
