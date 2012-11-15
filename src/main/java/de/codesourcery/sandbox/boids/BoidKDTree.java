@@ -10,9 +10,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -408,13 +406,12 @@ public class BoidKDTree<T>
         public List<T> getResults() 
         {
             final List<T> result = new ArrayList<>();
-            int i = 0;
 
             NodeWithDistance<T> current = null;
-            while ( i < maxNeighborCount && ( current = queue.poll() ) != null ) 
+            int toAdd = maxNeighborCount;
+            while ( toAdd > 0 && ( current = queue.poll() ) != null ) 
             {
-                current.node.addValues( result );
-                i++;
+            	toAdd -= current.node.addValues( result , toAdd );
             }
             return result;
         }
@@ -486,7 +483,7 @@ public class BoidKDTree<T>
             throw new RuntimeException("Not supported: add()");
         }
 
-        public abstract void addValues(Collection<T> collection);
+        public abstract int addValues(Collection<T> collection,int maxValuesToAdd);
 
         @Override
         public final boolean isLeaf()
@@ -537,9 +534,10 @@ public class BoidKDTree<T>
         }
 
         @Override
-        public void addValues(Collection<T> collection)
+        public int addValues(Collection<T> collection,int valuesToAdd)
         {
             collection.add( value );
+            return 1;
         }
 
         @Override
@@ -575,9 +573,16 @@ public class BoidKDTree<T>
         }        
 
         @Override
-        public void addValues(Collection<T> collection)
+        public int addValues(Collection<T> collection,int maxValuesToAdd)
         {
-            collection.addAll( values );
+        	int len = values.size();
+        	int toAdd = maxValuesToAdd - len;
+        	if ( toAdd >= len ) {
+        		collection.addAll( values );
+        		return len;
+        	}
+      		collection.addAll( values.subList( 0 , maxValuesToAdd ) );
+        	return toAdd;
         }
 
         @Override

@@ -45,7 +45,7 @@ public class Main extends JFrame
     protected static final boolean DEBUG_PERFORMANCE = true;
 
     protected static final double MAX_FORCE = 5;
-    protected static final double MAX_SPEED = 25;     
+    protected static final double MAX_SPEED = 10;     
 
     protected static final double COHESION_WEIGHT = 0.33d;
     protected static final double SEPARATION_WEIGHT = 0.4d;
@@ -61,7 +61,7 @@ public class Main extends JFrame
     public static final double ARROW_WIDTH=10;
     public static final double ARROW_LENGTH=ARROW_WIDTH*3;
 
-    protected static final int POPULATION_SIZE = 25000;
+    protected static final int POPULATION_SIZE = 30000;
 
     private World world;
 
@@ -76,7 +76,7 @@ public class Main extends JFrame
         System.out.println("Using "+THREAD_COUNT+" CPUs.");
         System.setProperty( "sun.java2d.opengl" , "true" );
 
-        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>( 100 );
+        BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>( 400 );
 
         final ThreadFactory threadFactory = new ThreadFactory() {
 
@@ -150,6 +150,8 @@ public class Main extends JFrame
         {
             if ( mayRender.compareAndSet(true,false ) ) 
             {            
+            	panel.repaint( world );
+            	
                 long time = -System.currentTimeMillis();
                 world = tick();
                 if ( DEBUG_PERFORMANCE ) 
@@ -159,14 +161,13 @@ public class Main extends JFrame
                         System.out.println("Calculation: "+time);
                     }
                 }
-                panel.repaint( world );
             }
         }        
     }
 
     private World tick() throws InterruptedException 
     {
-    	final int unitCount = THREAD_COUNT;
+    	final int unitCount = THREAD_COUNT*16;
     	
         final CountDownLatch workerThreads = new CountDownLatch( unitCount );
 
@@ -207,30 +208,22 @@ public class Main extends JFrame
     {
         @SuppressWarnings("unchecked")
         final ArrayList<Boid>[] toProcess = new ArrayList[listCount ];
-
+        final int boidsPerThread = allBoids.size() / listCount;
+        
         for ( int i = 0 ;i < listCount ; i++ ) {
-            toProcess[i] = new ArrayList<Boid>();
+            toProcess[i] = new ArrayList<Boid>( boidsPerThread );
         }
 
-        final int boidsPerThread = allBoids.size() / listCount;
-        int index = 0;
-        ArrayList<Boid> currentList = toProcess[0];
-        int i = 0;
-        for ( Boid b : allBoids ) 
-        {
-            currentList.add( b );
-            i++;
-            if ( i > boidsPerThread ) {
-                i = 0;
-                if ( index < listCount ) {
-                    index++;
-                    currentList = toProcess[index];
-                }
-            }
+        int currentStart = 0;
+        for ( int index = 0 ; index < listCount ; index++ , currentStart += boidsPerThread ) {
+        	toProcess[index].addAll( allBoids.subList( currentStart , currentStart + boidsPerThread ) );
+        }
+        if ( currentStart < allBoids.size() ) {
+        	toProcess[listCount-1].addAll( allBoids.subList( currentStart , allBoids.size() ) );
         }
         return toProcess;
     }
-
+    
     protected Vec2dMutable flock(Boid boid)
     {
         final NeighborAggregator visitor =new NeighborAggregator( boid );
