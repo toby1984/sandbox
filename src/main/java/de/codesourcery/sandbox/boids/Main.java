@@ -42,6 +42,8 @@ public class Main extends JFrame
     protected static final AtomicLong TICK_COUNTER = new AtomicLong(0);    
     protected static final AtomicLong FRAME_COUNTER = new AtomicLong(0);
 
+    protected static final int TARGET_FPS = 30;
+    
     protected static final boolean DEBUG_PERFORMANCE = true;
 
     protected static final double MAX_FORCE = 5;
@@ -61,7 +63,7 @@ public class Main extends JFrame
     public static final double ARROW_WIDTH=10;
     public static final double ARROW_LENGTH=ARROW_WIDTH*3;
 
-    protected static final int POPULATION_SIZE = 30000;
+    protected static final int POPULATION_SIZE = 21000;
 
     private World world;
 
@@ -96,10 +98,20 @@ public class Main extends JFrame
             private int dropCount;
             private int frameCount;
             private int previouslyDroppedFrame=-1;
+            
+            private final long start = System.currentTimeMillis();
+            
             @Override
             public void run()
             {
                 frameCount++;
+                
+                if ( (frameCount % 200) == 0 ) {
+                	long duration = System.currentTimeMillis() - start;
+                	double fps = (frameCount - dropCount ) / (duration/1000.0);
+                	System.out.println("FPS: "+fps);
+                }
+                
                 if ( ! mayRender.compareAndSet( false , true ) ) 
                 {
                     dropCount++;					
@@ -113,7 +125,7 @@ public class Main extends JFrame
         };
 
         vsyncThread = new ScheduledThreadPoolExecutor(1); 
-        vsyncThread.scheduleAtFixedRate( r , 0 , 40 , TimeUnit.MILLISECONDS );
+        vsyncThread.scheduleAtFixedRate( r , 0 , 1000 / TARGET_FPS  , TimeUnit.MILLISECONDS );
     }
 
     public static void main(String[] args) throws Exception
@@ -158,7 +170,7 @@ public class Main extends JFrame
                 {
                     time += System.currentTimeMillis();
                     if ( ( TICK_COUNTER.incrementAndGet() % 10 ) == 0 ) {
-                        System.out.println("Calculation: "+time);
+                        System.out.println("Calculation: "+time+" ms");
                     }
                 }
             }
@@ -386,7 +398,7 @@ public class Main extends JFrame
 
     private World createWorld() 
     {
-        World world = new World(); // 20x20 tiles
+        World world = new World(); 
 
         for ( int i = 0 ; i < POPULATION_SIZE ; i++ ) 
         {
@@ -430,8 +442,6 @@ public class Main extends JFrame
 
         private World currentWorld;
 
-        private ImageProvider provider;
-
         public MyPanel() 
         {
             setBackground(Color.WHITE);
@@ -471,10 +481,6 @@ public class Main extends JFrame
 
             final Graphics2D graphics = (Graphics2D) g;
             
-            if ( provider == null ) {
-                provider = new ImageProvider( graphics );
-            }
-
             final IBoidVisitor visitor = new IBoidVisitor() {
 
                 private int count = 0;
@@ -562,18 +568,8 @@ public class Main extends JFrame
                 drawVec( boid.getLocation() , boid.getLocation().plus( separationVec ) , g );                
             }
             
-//            drawArrowImage(fill,boid,g);
               drawArrow( fill,  boid ,  g );
         }     
-
-        private void drawArrowImage(boolean fill , Boid b,Graphics2D g) { 
-
-            float angleInDeg = b.getVelocity().angleInDeg( new Vec2d(b.getVelocity().x ,b.getVelocity().y - 5 ) );
-            BufferedImage image = provider.getImage( angleInDeg , g );
-            final int x = (int) Math.round( b.location.x * xInc ) - 7 ;
-            final int y = (int) Math.round( b.location.y * yInc ) - 7 ;
-            g.drawImage( image , x , y , null );
-        }
 
         private void drawArrow(boolean fill , Boid b,Graphics2D g) 
         {
@@ -683,64 +679,6 @@ public class Main extends JFrame
             final double y2 = (center.y + boidNeightbourRadius)*yInc;            
 
             g.fillOval( round(x1) , round(y1) , round(x2-x1) , round(y2-y1) ); 
-        }
-    }
-
-    protected static final class ImageProvider {
-
-        private final Map<Integer,BufferedImage> map = new HashMap<Integer,BufferedImage>();
-
-        public ImageProvider(Graphics2D graphics) {
-            for ( int i = 0 ; i <= 360 ; i++ ) {
-                map.put( i , createImage( i , graphics ) );
-            }
-        }
-        
-        public BufferedImage getImage(double angleInDegrees,Graphics2D graphics) 
-        {
-            final Integer intAngle = Integer.valueOf( (int) Math.round( angleInDegrees) );
-            return map.get( intAngle );
-        }
-
-        private Vec2d rotateAndTranslate(Vec2d input,int xOffset , int yOffset , double thetaInRad) 
-        {
-            final double cs = Math.cos(thetaInRad);
-            final double sn = Math.sin(thetaInRad);
-
-            final double xNew = input.x * cs - input.y * sn;
-            final double yNew = input.x * sn + input.y * cs;
-            return new Vec2d( xNew+xOffset ,yNew+yOffset );
-        }
-
-        private BufferedImage createImage(int angleInDegrees, Graphics2D graphics)
-        {
-            final double angleInRad= (angleInDegrees-180.0d) * (Math.PI/180.0d);  
-
-            BufferedImage sourceImage = graphics.getDeviceConfiguration().createCompatibleImage( 15 , 15 , BufferedImage.TYPE_INT_ARGB );
-            final Graphics2D g2d = sourceImage.createGraphics();
-            
-            g2d.setPaint( new Color(255,255,255,0) );
-            g2d.fillRect(0,0,15,15);
-            
-            g2d.setPaint( new Color(0,0,0,128) );
-
-            Vec2d p1 = new Vec2d(-5,-3);
-            Vec2d p2 = new Vec2d(0,5);
-            Vec2d p3 = new Vec2d(5,-3);
-
-            p1 = rotateAndTranslate( p1 , 8 , 7 , angleInRad );
-            p2 = rotateAndTranslate( p2 , 8 , 7 , angleInRad );
-            p3 = rotateAndTranslate( p3 , 8 , 7 , angleInRad );
-
-            final int x[] = new int[] {round(p1.x)  , round(p2.x) , round(p3.x)};
-            final int y[] = new int[] {round(p1.y) ,  round(p2.y) , round(p3.y) };
-            g2d.fillPolygon( x , y , 3 );
-
-//            try {
-//                ImageIO.write(sourceImage, "png", new File("/tmp/img_"+angleInDegrees+".png" ) );
-//            } catch (IOException e) {
-//            }
-            return sourceImage;
         }
     }
 
